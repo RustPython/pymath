@@ -203,6 +203,52 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
     }
 }
 
+// natural log of the absolute value of the Gamma function.
+// For large arguments, Lanczos' formula works extremely well here.
+pub fn lgamma(x: f64) -> Result<f64, Error> {
+    // special cases
+    if !x.is_finite() {
+        if x.is_nan() {
+            return Ok(x); // lgamma(nan) = nan
+        } else {
+            return Ok(f64::INFINITY); // lgamma(+-inf) = +inf
+        }
+    }
+
+    // integer arguments
+    if x == x.floor() && x <= 2.0 {
+        if x <= 0.0 {
+            // lgamma(n) = inf, divide-by-zero for integers n <= 0
+            return Err(Error::EDOM);
+        } else {
+            // lgamma(1) = lgamma(2) = 0.0
+            return Ok(0.0);
+        }
+    }
+
+    let absx = x.abs();
+    // tiny arguments: lgamma(x) ~ -log(fabs(x)) for small x
+    if absx < 1e-20 {
+        return Ok(-absx.ln());
+    }
+
+    // Lanczos' formula.  We could save a fraction of a ulp in accuracy by
+    // having a second set of numerator coefficients for lanczos_sum that
+    // absorbed the exp(-lanczos_g) term, and throwing out the lanczos_g
+    // subtraction below; it's probably not worth it.
+    let mut r = lanczos_sum(absx).ln() - LANCZOS_G;
+    r += (absx - 0.5) * ((absx + LANCZOS_G - 0.5).ln() - 1.0);
+
+    if x < 0.0 {
+        // Use reflection formula to get value for negative x
+        r = LOG_PI - m_sinpi(absx).abs().ln() - absx.ln() - r;
+    }
+    if r.is_infinite() {
+        return Err(Error::ERANGE);
+    }
+    Ok(r)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,6 +303,27 @@ mod tests {
                 // assert_eq!(py_gamma_repr, rs_gamma_repr, "x = {x}, py_gamma = {py_gamma}, rs_gamma = {rs_gamma}");
                 // allow 1 bit error for now
                 assert!((py_gamma_repr - rs_gamma_repr).abs() <= 1, "x = {x} diff: {}, py_gamma = {py_gamma} ({py_gamma_repr:x}), rs_gamma = {rs_gamma} ({rs_gamma_repr:x})", py_gamma_repr ^ rs_gamma_repr);
+            });
+        }
+
+        #[test]
+        fn test_lgamma(x: f64) {
+            let rs_lgamma = lgamma(x);
+
+            pyo3::prepare_freethreaded_python();
+            Python::with_gil(|py| {
+            let math = PyModule::import(py, "math").unwrap();
+            let py_lgamma_func = math
+                .getattr("lgamma")
+                .unwrap();
+            let r = py_lgamma_func.call1((x,));
+            let Some((py_lgamma, rs_lgamma)) = unwrap(py, r, rs_lgamma) else {
+                return;
+            };
+            let py_lgamma_repr = unsafe { std::mem::transmute::<f64, i64>(py_lgamma) };
+            let rs_lgamma_repr = unsafe { std::mem::transmute::<f64, i64>(rs_lgamma) };
+            // allow 6 bit error for now
+            assert!((py_lgamma_repr - rs_lgamma_repr).abs() <= 6, "x = {x} diff: {}, py_lgamma = {py_lgamma} ({py_lgamma_repr:x}), rs_lgamma = {rs_lgamma} ({rs_lgamma_repr:x})", py_lgamma_repr ^ rs_lgamma_repr);
             });
         }
     }

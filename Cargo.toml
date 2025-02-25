@@ -1,0 +1,8 @@
+[package]
+name = "pymath"
+version = "0.1.0"
+edition = "2024"
+
+[dev-dependencies]
+proptest = "1.6.0"
+pyo3 = "0.23.4"

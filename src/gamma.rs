@@ -173,7 +173,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
         q - absx
     };
     let z = z * LANCZOS_G / y;
-    let r = if x < 0.0 {
+    let mut r = if x < 0.0 {
         let mut r = -PI / m_sinpi(absx) / absx * y.exp() / lanczos_sum(absx);
         r -= z * r;
         if absx < 140.0 {
@@ -196,6 +196,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
         }
         r
     };
+
     if r.is_infinite() {
         return Err((f64::INFINITY, Error::ERANGE).1);
     } else {
@@ -241,7 +242,14 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
 
     if x < 0.0 {
         // Use reflection formula to get value for negative x
-        r = LOG_PI - m_sinpi(absx).abs().ln() - absx.ln() - r;
+
+        // Calculate the sin(pi * x) value using m_sinpi
+        let sinpi_val = m_sinpi(absx);
+
+        // In CPython, the expression is:
+        // r = logpi - log(fabs(m_sinpi(absx))) - log(absx) - r;
+        // We'll match this order exactly
+        r = LOG_PI - sinpi_val.abs().ln() - absx.ln() - r;
     }
     if r.is_infinite() {
         return Err(Error::ERANGE);
@@ -281,6 +289,60 @@ mod tests {
                 None
             }
         }
+    }
+
+    #[test]
+    fn test_specific_lgamma_value() {
+        let x = -3.8510064710745118;
+        let rs_lgamma = lgamma(x).unwrap();
+
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let math = PyModule::import(py, "math").unwrap();
+            let py_lgamma = math
+                .getattr("lgamma")
+                .unwrap()
+                .call1((x,))
+                .unwrap()
+                .extract::<f64>()
+                .unwrap();
+
+            println!("x = {}", x);
+            println!("Python lgamma = {} ({:x})", py_lgamma, unsafe {
+                std::mem::transmute::<f64, u64>(py_lgamma)
+            });
+            println!("Rust lgamma = {} ({:x})", rs_lgamma, unsafe {
+                std::mem::transmute::<f64, u64>(rs_lgamma)
+            });
+
+            // Print intermediate values
+            let absx = x.abs();
+            let sinpi_val = m_sinpi(absx);
+
+            println!("absx = {}", absx);
+            println!("m_sinpi = {}", sinpi_val);
+
+            // Compare with Python's sin(pi * x)
+            let py_code = PyModule::from_code(
+                py,
+                c"import math\ndef sinpi(x): return math.sin(math.pi * x)\n",
+                c"",
+                c"",
+            )
+            .unwrap();
+            let py_sinpi = py_code
+                .getattr("sinpi")
+                .unwrap()
+                .call1((absx,))
+                .unwrap()
+                .extract::<f64>()
+                .unwrap();
+            println!("Python sinpi = {}", py_sinpi);
+
+            let py_lgamma_repr = unsafe { std::mem::transmute::<f64, u64>(py_lgamma) };
+            let rs_lgamma_repr = unsafe { std::mem::transmute::<f64, u64>(rs_lgamma) };
+            println!("Bit difference: {}", py_lgamma_repr ^ rs_lgamma_repr);
+        });
     }
 
     proptest! {

@@ -1,7 +1,6 @@
 use crate::Error;
 // use std::f64::consts::PI;
 
-
 // Import C library functions properly
 unsafe extern "C" {
     fn exp(x: f64) -> f64;
@@ -197,7 +196,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
         let lanczos = lanczos_sum(absx);
         let mut r = term3 / lanczos;
         r -= z * r;
-        
+
         if absx < 140.0 {
             unsafe { r / pow(y, absx - 0.5) }
         } else {
@@ -211,7 +210,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
         let exp_y = unsafe { exp(y) };
         let mut r = lanczos / exp_y;
         r += z * r;
-        
+
         if absx < 140.0 {
             unsafe { r * pow(y, absx - 0.5) }
         } else {
@@ -261,19 +260,19 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
     // Using C's math functions through libc to match CPython
     let lanczos_sum_val = lanczos_sum(absx);
     let log_lanczos = unsafe { log(lanczos_sum_val) };
-    
+
     // Subtract lanczos_g as a separate step
     let mut r = log_lanczos - LANCZOS_G;
-    
+
     // Calculate (absx - 0.5) term
     let factor = absx - 0.5;
-    
+
     // Calculate log term
     let log_term = unsafe { log(absx + LANCZOS_G - 0.5) };
-    
+
     // Calculate the multiplication and subtraction
     let step2 = factor * (log_term - 1.0);
-    
+
     // Combine the results
     r += step2;
 
@@ -283,11 +282,11 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
         let abs_sinpi = unsafe { fabs(sinpi_val) };
         let log_abs_sinpi = unsafe { log(abs_sinpi) };
         let log_absx = unsafe { log(absx) };
-        
+
         // Combine in exactly the same order as CPython
         r = LOG_PI - log_abs_sinpi - log_absx - r;
     }
-    
+
     if r.is_infinite() {
         return Err(Error::ERANGE);
     }
@@ -329,8 +328,72 @@ mod tests {
     }
 
     #[test]
+    fn test_literal() {
+        // Verify single constants
+        assert_eq!(PI, 3.141592653589793238462643383279502884197);
+        assert_eq!(LOG_PI, 1.144729885849400174143427351353058711647);
+        assert_eq!(LANCZOS_G, 6.024680040776729583740234375);
+        assert_eq!(LANCZOS_G_MINUS_HALF, 5.524680040776729583740234375);
+
+        // Verify LANCZOS_NUM_COEFFS
+        assert_eq!(LANCZOS_NUM_COEFFS[0], 23531376880.410759);
+        assert_eq!(LANCZOS_NUM_COEFFS[1], 42919803642.649101);
+        assert_eq!(LANCZOS_NUM_COEFFS[2], 35711959237.355667);
+        assert_eq!(LANCZOS_NUM_COEFFS[3], 17921034426.037209);
+        assert_eq!(LANCZOS_NUM_COEFFS[4], 6039542586.3520279);
+        assert_eq!(LANCZOS_NUM_COEFFS[5], 1439720407.3117216);
+        assert_eq!(LANCZOS_NUM_COEFFS[6], 248874557.86205417);
+        assert_eq!(LANCZOS_NUM_COEFFS[7], 31426415.585400194);
+        assert_eq!(LANCZOS_NUM_COEFFS[8], 2876370.6289353725);
+        assert_eq!(LANCZOS_NUM_COEFFS[9], 186056.26539522348);
+        assert_eq!(LANCZOS_NUM_COEFFS[10], 8071.6720023658163);
+        assert_eq!(LANCZOS_NUM_COEFFS[11], 210.82427775157936);
+        assert_eq!(LANCZOS_NUM_COEFFS[12], 2.5066282746310002);
+
+        // Verify LANCZOS_DEN_COEFFS
+        assert_eq!(LANCZOS_DEN_COEFFS[0], 0.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[1], 39916800.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[2], 120543840.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[3], 150917976.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[4], 105258076.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[5], 45995730.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[6], 13339535.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[7], 2637558.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[8], 357423.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[9], 32670.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[10], 1925.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[11], 66.0);
+        assert_eq!(LANCZOS_DEN_COEFFS[12], 1.0);
+
+        // Verify GAMMA_INTEGRAL
+        assert_eq!(GAMMA_INTEGRAL[0], 1.0);
+        assert_eq!(GAMMA_INTEGRAL[1], 1.0);
+        assert_eq!(GAMMA_INTEGRAL[2], 2.0);
+        assert_eq!(GAMMA_INTEGRAL[3], 6.0);
+        assert_eq!(GAMMA_INTEGRAL[4], 24.0);
+        assert_eq!(GAMMA_INTEGRAL[5], 120.0);
+        assert_eq!(GAMMA_INTEGRAL[6], 720.0);
+        assert_eq!(GAMMA_INTEGRAL[7], 5040.0);
+        assert_eq!(GAMMA_INTEGRAL[8], 40320.0);
+        assert_eq!(GAMMA_INTEGRAL[9], 362880.0);
+        assert_eq!(GAMMA_INTEGRAL[10], 3628800.0);
+        assert_eq!(GAMMA_INTEGRAL[11], 39916800.0);
+        assert_eq!(GAMMA_INTEGRAL[12], 479001600.0);
+        assert_eq!(GAMMA_INTEGRAL[13], 6227020800.0);
+        assert_eq!(GAMMA_INTEGRAL[14], 87178291200.0);
+        assert_eq!(GAMMA_INTEGRAL[15], 1307674368000.0);
+        assert_eq!(GAMMA_INTEGRAL[16], 20922789888000.0);
+        assert_eq!(GAMMA_INTEGRAL[17], 355687428096000.0);
+        assert_eq!(GAMMA_INTEGRAL[18], 6402373705728000.0);
+        assert_eq!(GAMMA_INTEGRAL[19], 1.21645100408832e+17);
+        assert_eq!(GAMMA_INTEGRAL[20], 2.43290200817664e+18);
+        assert_eq!(GAMMA_INTEGRAL[21], 5.109094217170944e+19);
+        assert_eq!(GAMMA_INTEGRAL[22], 1.1240007277776077e+21);
+    }
+
+    #[test]
     fn test_specific_lgamma_value() {
-        let x = -3.8510064710745118;
+        let x = 0.003585187864492183;
         let rs_lgamma = lgamma(x).unwrap();
 
         pyo3::prepare_freethreaded_python();

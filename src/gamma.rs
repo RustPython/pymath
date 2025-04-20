@@ -1,40 +1,82 @@
 use crate::Error;
-use std::f64::consts::PI;
+// use std::f64::consts::PI;
 
-const LOG_PI: f64 = 1.144729885849400174143427351353058711647;
+
+// Import C library functions properly
+unsafe extern "C" {
+    fn exp(x: f64) -> f64;
+    fn log(x: f64) -> f64;
+    fn sin(x: f64) -> f64;
+    fn cos(x: f64) -> f64;
+    fn pow(x: f64, y: f64) -> f64;
+    fn floor(x: f64) -> f64;
+    fn fabs(x: f64) -> f64;
+    fn round(x: f64) -> f64;
+    fn fmod(x: f64, y: f64) -> f64;
+}
+
+const PI: f64 = f64::from_bits(0x400921fb54442d18); // = 3.141592653589793238462643383279502884197;
+const LOG_PI: f64 = f64::from_bits(0x3ff250d048e7a1bd); // = 1.144729885849400174143427351353058711647;
 
 const LANCZOS_N: usize = 13;
-const LANCZOS_G: f64 = 6.024680040776729583740234375;
-const LANCZOS_G_MINUS_HALF: f64 = 5.524680040776729583740234375;
+const LANCZOS_G: f64 = f64::from_bits(0x40181945b9800000); // = 6.024680040776729583740234375;
+const LANCZOS_G_MINUS_HALF: f64 = f64::from_bits(0x40161945b9800000); // = 5.524680040776729583740234375;
 const LANCZOS_NUM_COEFFS: [f64; LANCZOS_N] = [
-    23531376880.410759688572007674451636754734846804940,
-    42919803642.649098768957899047001988850926355848959,
-    35711959237.355668049440185451547166705960488635843,
-    17921034426.037209699919755754458931112671403265390,
-    6039542586.3520280050642916443072979210699388420708,
-    1439720407.3117216736632230727949123939715485786772,
-    248874557.86205415651146038641322942321632125127801,
-    31426415.585400194380614231628318205362874684987640,
-    2876370.6289353724412254090516208496135991145378768,
-    186056.26539522349504029498971604569928220784236328,
-    8071.6720023658162106380029022722506138218516325024,
-    210.82427775157934587250973392071336271166969580291,
-    2.5066282746310002701649081771338373386264310793408,
+    f64::from_bits(0x4215ea5143c1a49e), // 23531376880.410759
+    f64::from_bits(0x4223fc7075f54c57), // 42919803642.649101
+    f64::from_bits(0x4220a132818ab61a), // 35711959237.355667
+    f64::from_bits(0x4210b0b522e8261a), // 17921034426.037209
+    f64::from_bits(0x41f67fc1b3a5a1e8), // 6039542586.3520279
+    f64::from_bits(0x41d57418f5d3f33f), // 1439720407.3117216
+    f64::from_bits(0x41adab0c7bb95f2a), // 248874557.86205417
+    f64::from_bits(0x417df876f95dcc98), // 31426415.585400194
+    f64::from_bits(0x4145f1e95080f44c), // 2876370.6289353725
+    f64::from_bits(0x4106b6421f8787eb), // 186056.26539522348
+    f64::from_bits(0x40bf87ac0858d804), // 8071.6720023658163
+    f64::from_bits(0x406a5a607bbc3b52), // 210.82427775157936
+    f64::from_bits(0x40040d931ff62705), // 2.5066282746310002
 ];
 const LANCZOS_DEN_COEFFS: [f64; LANCZOS_N] = [
-    0.0,
-    39916800.0,
-    120543840.0,
-    150917976.0,
-    105258076.0,
-    45995730.0,
-    13339535.0,
-    2637558.0,
-    357423.0,
-    32670.0,
-    1925.0,
-    66.0,
-    1.0,
+    f64::from_bits(0x0000000000000000), // 0.0
+    f64::from_bits(0x418308a800000000), // 39916800.0
+    f64::from_bits(0x419cbd6980000000), // 120543840.0
+    f64::from_bits(0x41a1fda6b0000000), // 150917976.0
+    f64::from_bits(0x4199187170000000), // 105258076.0
+    f64::from_bits(0x4185eeb690000000), // 45995730.0
+    f64::from_bits(0x41697171e0000000), // 13339535.0
+    f64::from_bits(0x41441f7b00000000), // 2637558.0
+    f64::from_bits(0x4115d0bc00000000), // 357423.0
+    f64::from_bits(0x40dfe78000000000), // 32670.0
+    f64::from_bits(0x409e140000000000), // 1925.0
+    f64::from_bits(0x4050800000000000), // 66.0
+    f64::from_bits(0x3ff0000000000000), // 1.0
+];
+
+const NGAMMA_INTEGRAL: usize = 23;
+const GAMMA_INTEGRAL: [f64; NGAMMA_INTEGRAL] = [
+    f64::from_bits(0x3ff0000000000000), // 1.0
+    f64::from_bits(0x3ff0000000000000), // 1.0
+    f64::from_bits(0x4000000000000000), // 2.0
+    f64::from_bits(0x4018000000000000), // 6.0
+    f64::from_bits(0x4038000000000000), // 24.0
+    f64::from_bits(0x405e000000000000), // 120.0
+    f64::from_bits(0x4086800000000000), // 720.0
+    f64::from_bits(0x40b3b00000000000), // 5040.0
+    f64::from_bits(0x40e3b00000000000), // 40320.0
+    f64::from_bits(0x4116260000000000), // 362880.0
+    f64::from_bits(0x414baf8000000000), // 3628800.0
+    f64::from_bits(0x418308a800000000), // 39916800.0
+    f64::from_bits(0x41bc8cfc00000000), // 479001600.0
+    f64::from_bits(0x41f7328cc0000000), // 6227020800.0
+    f64::from_bits(0x42344c3b28000000), // 87178291200.0
+    f64::from_bits(0x4273077775800000), // 1307674368000.0
+    f64::from_bits(0x42b3077775800000), // 20922789888000.0
+    f64::from_bits(0x42f437eeecd80000), // 355687428096000.0
+    f64::from_bits(0x4336beecca730000), // 6402373705728000.0
+    f64::from_bits(0x437b02b930689000), // 1.21645100408832e+17
+    f64::from_bits(0x43c0e1b3be415a00), // 2.43290200817664e+18
+    f64::from_bits(0x4406283be9b5c620), // 5.109094217170944e+19
+    f64::from_bits(0x444e77526159f06c), // 1.1240007277776077e+21
 ];
 
 fn lanczos_sum(x: f64) -> f64 {
@@ -65,49 +107,22 @@ fn lanczos_sum(x: f64) -> f64 {
 fn m_sinpi(x: f64) -> f64 {
     // this function should only ever be called for finite arguments
     debug_assert!(x.is_finite());
-    let y = x.abs() % 2.0;
-    let n = (2.0 * y).round() as i32;
+    let y = unsafe { fmod(fabs(x), 2.0) };
+    let n = unsafe { round(2.0 * y) } as i32;
     let r = match n {
-        0 => (PI * y).sin(),
-        1 => (PI * (y - 0.5)).cos(),
+        0 => unsafe { sin(PI * y) },
+        1 => unsafe { cos(PI * (y - 0.5)) },
         2 => {
             // N.B. -sin(pi*(y-1.0)) is *not* equivalent: it would give
             // -0.0 instead of 0.0 when y == 1.0.
-            (PI * (1.0 - y)).sin()
+            unsafe { sin(PI * (1.0 - y)) }
         }
-        3 => -(PI * (y - 1.5)).cos(),
-        4 => (PI * (y - 2.0)).sin(),
+        3 => unsafe { -cos(PI * (y - 1.5)) },
+        4 => unsafe { sin(PI * (y - 2.0)) },
         _ => unreachable!(),
     };
     (1.0f64).copysign(x) * r
 }
-
-const NGAMMA_INTEGRAL: usize = 23;
-const GAMMA_INTEGRAL: [f64; NGAMMA_INTEGRAL] = [
-    1.0,
-    1.0,
-    2.0,
-    6.0,
-    24.0,
-    120.0,
-    720.0,
-    5040.0,
-    40320.0,
-    362880.0,
-    3628800.0,
-    39916800.0,
-    479001600.0,
-    6227020800.0,
-    87178291200.0,
-    1307674368000.0,
-    20922789888000.0,
-    355687428096000.0,
-    6402373705728000.0,
-    121645100408832000.0,
-    2432902008176640000.0,
-    51090942171709440000.0,
-    1124000727777607680000.0,
-];
 
 pub fn tgamma(x: f64) -> Result<f64, Error> {
     // special cases
@@ -130,7 +145,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
         return Err((v, Error::EDOM).1);
     }
     // integer arguments
-    if x == x.floor() {
+    if x == unsafe { floor(x) } {
         if x < 0.0 {
             // tgamma(n) = nan, invalid for
             return Err((f64::NAN, Error::EDOM).1);
@@ -139,7 +154,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
             return Ok(GAMMA_INTEGRAL[x as usize - 1]);
         }
     }
-    let absx = x.abs();
+    let absx = unsafe { fabs(x) };
     // tiny arguments:  tgamma(x) ~ 1/x for x near 0
     if absx < 1e-20 {
         let r = 1.0 / x;
@@ -173,28 +188,38 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
         q - absx
     };
     let z = z * LANCZOS_G / y;
-    let mut r = if x < 0.0 {
-        let mut r = -PI / m_sinpi(absx) / absx * y.exp() / lanczos_sum(absx);
+    let r = if x < 0.0 {
+        // Using C's math functions through libc to match CPython
+        let term1 = -PI / m_sinpi(absx);
+        let term2 = term1 / absx;
+        let exp_y = unsafe { exp(y) };
+        let term3 = term2 * exp_y;
+        let lanczos = lanczos_sum(absx);
+        let mut r = term3 / lanczos;
         r -= z * r;
+        
         if absx < 140.0 {
-            r /= y.powf(absx - 0.5);
+            unsafe { r / pow(y, absx - 0.5) }
         } else {
-            let sqrtpow = y.powf(absx / 2.0 - 0.25);
+            let sqrtpow = unsafe { pow(y, absx / 2.0 - 0.25) };
             r /= sqrtpow;
             r /= sqrtpow;
+            r
         }
-        r
     } else {
-        let mut r = lanczos_sum(absx) / y.exp();
+        let lanczos = lanczos_sum(absx);
+        let exp_y = unsafe { exp(y) };
+        let mut r = lanczos / exp_y;
         r += z * r;
+        
         if absx < 140.0 {
-            r *= y.powf(absx - 0.5);
+            unsafe { r * pow(y, absx - 0.5) }
         } else {
-            let sqrtpow = y.powf(absx / 2.0 - 0.25);
+            let sqrtpow = unsafe { pow(y, absx / 2.0 - 0.25) };
             r *= sqrtpow;
             r *= sqrtpow;
+            r
         }
-        r
     };
 
     if r.is_infinite() {
@@ -217,7 +242,7 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
     }
 
     // integer arguments
-    if x == x.floor() && x <= 2.0 {
+    if x == unsafe { floor(x) } && x <= 2.0 {
         if x <= 0.0 {
             // lgamma(n) = inf, divide-by-zero for integers n <= 0
             return Err(Error::EDOM);
@@ -227,30 +252,42 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
         }
     }
 
-    let absx = x.abs();
+    let absx = unsafe { fabs(x) };
     // tiny arguments: lgamma(x) ~ -log(fabs(x)) for small x
     if absx < 1e-20 {
-        return Ok(-absx.ln());
+        return Ok(-unsafe { log(absx) });
     }
 
-    // Lanczos' formula.  We could save a fraction of a ulp in accuracy by
-    // having a second set of numerator coefficients for lanczos_sum that
-    // absorbed the exp(-lanczos_g) term, and throwing out the lanczos_g
-    // subtraction below; it's probably not worth it.
-    let mut r = lanczos_sum(absx).ln() - LANCZOS_G;
-    r += (absx - 0.5) * ((absx + LANCZOS_G - 0.5).ln() - 1.0);
+    // Using C's math functions through libc to match CPython
+    let lanczos_sum_val = lanczos_sum(absx);
+    let log_lanczos = unsafe { log(lanczos_sum_val) };
+    
+    // Subtract lanczos_g as a separate step
+    let mut r = log_lanczos - LANCZOS_G;
+    
+    // Calculate (absx - 0.5) term
+    let factor = absx - 0.5;
+    
+    // Calculate log term
+    let log_term = unsafe { log(absx + LANCZOS_G - 0.5) };
+    
+    // Calculate the multiplication and subtraction
+    let step2 = factor * (log_term - 1.0);
+    
+    // Combine the results
+    r += step2;
 
     if x < 0.0 {
-        // Use reflection formula to get value for negative x
-
-        // Calculate the sin(pi * x) value using m_sinpi
+        // Calculate each component separately as in CPython
         let sinpi_val = m_sinpi(absx);
-
-        // In CPython, the expression is:
-        // r = logpi - log(fabs(m_sinpi(absx))) - log(absx) - r;
-        // We'll match this order exactly
-        r = LOG_PI - sinpi_val.abs().ln() - absx.ln() - r;
+        let abs_sinpi = unsafe { fabs(sinpi_val) };
+        let log_abs_sinpi = unsafe { log(abs_sinpi) };
+        let log_absx = unsafe { log(absx) };
+        
+        // Combine in exactly the same order as CPython
+        r = LOG_PI - log_abs_sinpi - log_absx - r;
     }
+    
     if r.is_infinite() {
         return Err(Error::ERANGE);
     }
@@ -342,6 +379,8 @@ mod tests {
             let py_lgamma_repr = unsafe { std::mem::transmute::<f64, u64>(py_lgamma) };
             let rs_lgamma_repr = unsafe { std::mem::transmute::<f64, u64>(rs_lgamma) };
             println!("Bit difference: {}", py_lgamma_repr ^ rs_lgamma_repr);
+
+            assert_eq!(py_lgamma_repr, rs_lgamma_repr);
         });
     }
 

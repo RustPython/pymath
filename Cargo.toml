@@ -1,12 +1,16 @@
 [package]
 name = "pymath"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 
 [features]
 # Turning on this feature on aarch64-apple-darwin helps bit representation compatibility
 # See also: https://github.com/python/cpython/issues/132763
 mul_add = []
+
+[dependencies]
+errno = "0.3"
+libc = "0.2"
 
 [dev-dependencies]
 proptest = "1.6.0"

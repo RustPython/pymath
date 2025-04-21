@@ -11,12 +11,33 @@ env:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-
+    name: Build and test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+          ubuntu-latest,
+          windows-latest,
+          # macos-latest  # disabled due to incompatibility. See issue #1
+        ]
+        rust: [stable]
     steps:
     - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        check-latest: true
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ matrix.rust }}
+        override: true
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Run tests on Release
+      run: cargo test --release --verbose

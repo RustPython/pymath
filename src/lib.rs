@@ -2,4 +2,4 @@ mod err;
 mod gamma;
 
 pub use err::Error;
-pub use gamma::{tgamma as gamma, lgamma};
+pub use gamma::{lgamma, tgamma as gamma};

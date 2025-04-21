@@ -117,7 +117,8 @@ const GAMMA_INTEGRAL: [f64; NGAMMA_INTEGRAL] = [
     1124000727777607680000.0,
 ];
 
-pub fn tgamma(x: f64) -> Result<f64, Error> {
+// tgamma
+pub fn gamma(x: f64) -> crate::Result<f64> {
     // special cases
     if !x.is_finite() {
         if x.is_nan() || x > 0.0 {
@@ -213,7 +214,7 @@ pub fn tgamma(x: f64) -> Result<f64, Error> {
 
 // natural log of the absolute value of the Gamma function.
 // For large arguments, Lanczos' formula works extremely well here.
-pub fn lgamma(x: f64) -> Result<f64, Error> {
+pub fn lgamma(x: f64) -> crate::Result<f64> {
     // special cases
     if !x.is_finite() {
         if x.is_nan() {
@@ -258,79 +259,10 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
     Ok(r)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pyo3::Python;
-    use pyo3::prelude::*;
-
-    use proptest::prelude::*;
-
-    fn unwrap<'a, T: 'a>(
-        py: Python,
-        py_v: PyResult<Bound<'a, PyAny>>,
-        v: Result<T, crate::Error>,
-    ) -> Option<(T, T)>
-    where
-        T: PartialEq + std::fmt::Debug + FromPyObject<'a>,
-    {
-        match py_v {
-            Ok(py_v) => {
-                let py_v: T = py_v.extract().unwrap();
-                Some((py_v, v.unwrap()))
-            }
-            Err(e) => {
-                if e.is_instance_of::<pyo3::exceptions::PyValueError>(py) {
-                    assert_eq!(v.err(), Some(Error::EDOM));
-                } else if e.is_instance_of::<pyo3::exceptions::PyOverflowError>(py) {
-                    assert_eq!(v.err(), Some(Error::ERANGE));
-                } else {
-                    panic!();
-                }
-                None
-            }
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn test_tgamma(x: f64) {
-            let rs_gamma = tgamma(x);
-
-            pyo3::prepare_freethreaded_python();
-            Python::with_gil(|py| {
-                let math = PyModule::import(py, "math").unwrap();
-                let py_gamma_func = math
-                    .getattr("gamma")
-                    .unwrap();
-                let r = py_gamma_func.call1((x,));
-                let Some((py_gamma, rs_gamma)) = unwrap(py, r, rs_gamma) else {
-                    return;
-                };
-                let py_gamma_repr = py_gamma.to_bits();
-                let rs_gamma_repr = rs_gamma.to_bits();
-                assert_eq!(py_gamma_repr, rs_gamma_repr, "x = {x}, py_gamma = {py_gamma}, rs_gamma = {rs_gamma}");
-            });
-        }
-
-        #[test]
-        fn test_lgamma(x: f64) {
-            let rs_lgamma = lgamma(x);
-
-            pyo3::prepare_freethreaded_python();
-            Python::with_gil(|py| {
-                let math = PyModule::import(py, "math").unwrap();
-                let py_lgamma_func = math
-                    .getattr("lgamma")
-                    .unwrap();
-                let r = py_lgamma_func.call1((x,));
-                let Some((py_lgamma, rs_lgamma)) = unwrap(py, r, rs_lgamma) else {
-                    return;
-                };
-                let py_lgamma_repr = py_lgamma.to_bits();
-                let rs_lgamma_repr = rs_lgamma.to_bits();
-                assert_eq!(py_lgamma_repr, rs_lgamma_repr, "x = {x}, py_lgamma = {py_lgamma}, rs_gamma = {rs_lgamma}");
-            });
-        }
-    }
-}
+super::pyo3_proptest!(gamma(Result<_>), test_gamma, proptest_gamma, fulltest_gamma);
+super::pyo3_proptest!(
+    lgamma(Result<_>),
+    test_lgamma,
+    proptest_lgamma,
+    fulltest_lgamma
+);

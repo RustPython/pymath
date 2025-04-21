@@ -298,11 +298,9 @@ mod tests {
                 let Some((py_gamma, rs_gamma)) = unwrap(py, r, rs_gamma) else {
                     return;
                 };
-                let py_gamma_repr = unsafe { std::mem::transmute::<f64, i64>(py_gamma) };
-                let rs_gamma_repr = unsafe { std::mem::transmute::<f64, i64>(rs_gamma) };
-                // assert_eq!(py_gamma_repr, rs_gamma_repr, "x = {x}, py_gamma = {py_gamma}, rs_gamma = {rs_gamma}");
-                // allow 1 bit error for now
-                assert!((py_gamma_repr - rs_gamma_repr).abs() <= 1, "x = {x} diff: {}, py_gamma = {py_gamma} ({py_gamma_repr:x}), rs_gamma = {rs_gamma} ({rs_gamma_repr:x})", py_gamma_repr ^ rs_gamma_repr);
+                let py_gamma_repr = py_gamma.to_bits();
+                let rs_gamma_repr = rs_gamma.to_bits();
+                assert_eq!(py_gamma_repr, rs_gamma_repr, "x = {x}, py_gamma = {py_gamma}, rs_gamma = {rs_gamma}");
             });
         }
 
@@ -312,18 +310,17 @@ mod tests {
 
             pyo3::prepare_freethreaded_python();
             Python::with_gil(|py| {
-            let math = PyModule::import(py, "math").unwrap();
-            let py_lgamma_func = math
-                .getattr("lgamma")
-                .unwrap();
-            let r = py_lgamma_func.call1((x,));
-            let Some((py_lgamma, rs_lgamma)) = unwrap(py, r, rs_lgamma) else {
-                return;
-            };
-            let py_lgamma_repr = unsafe { std::mem::transmute::<f64, i64>(py_lgamma) };
-            let rs_lgamma_repr = unsafe { std::mem::transmute::<f64, i64>(rs_lgamma) };
-            // allow 6 bit error for now
-            assert!((py_lgamma_repr - rs_lgamma_repr).abs() <= 6, "x = {x} diff: {}, py_lgamma = {py_lgamma} ({py_lgamma_repr:x}), rs_lgamma = {rs_lgamma} ({rs_lgamma_repr:x})", py_lgamma_repr ^ rs_lgamma_repr);
+                let math = PyModule::import(py, "math").unwrap();
+                let py_lgamma_func = math
+                    .getattr("lgamma")
+                    .unwrap();
+                let r = py_lgamma_func.call1((x,));
+                let Some((py_lgamma, rs_lgamma)) = unwrap(py, r, rs_lgamma) else {
+                    return;
+                };
+                let py_lgamma_repr = py_lgamma.to_bits();
+                let rs_lgamma_repr = rs_lgamma.to_bits();
+                assert_eq!(py_lgamma_repr, rs_lgamma_repr, "x = {x}, py_lgamma = {py_lgamma}, rs_gamma = {rs_lgamma}");
             });
         }
     }

@@ -3,6 +3,11 @@ name = "pymath"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Turning on this feature on aarch64-apple-darwin helps bit representation compatibility
+# See also: https://github.com/python/cpython/issues/132763
+mul_add = []
+
 [dev-dependencies]
 proptest = "1.6.0"
 pyo3 = { version = "0.24", features = ["abi3"] }

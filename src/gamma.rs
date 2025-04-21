@@ -37,6 +37,14 @@ const LANCZOS_DEN_COEFFS: [f64; LANCZOS_N] = [
     1.0,
 ];
 
+fn mul_add(a: f64, b: f64, c: f64) -> f64 {
+    if cfg!(feature = "mul_add") {
+        a.mul_add(b, c)
+    } else {
+        a * b + c
+    }
+}
+
 fn lanczos_sum(x: f64) -> f64 {
     let mut num = 0.0;
     let mut den = 0.0;
@@ -50,8 +58,8 @@ fn lanczos_sum(x: f64) -> f64 {
     // this resulted in lower accuracy.
     if x < 5.0 {
         for i in (0..LANCZOS_N).rev() {
-            num = num * x + LANCZOS_NUM_COEFFS[i];
-            den = den * x + LANCZOS_DEN_COEFFS[i];
+            num = mul_add(num, x, LANCZOS_NUM_COEFFS[i]);
+            den = mul_add(den, x, LANCZOS_DEN_COEFFS[i]);
         }
     } else {
         for i in 0..LANCZOS_N {
@@ -237,7 +245,8 @@ pub fn lgamma(x: f64) -> Result<f64, Error> {
     // absorbed the exp(-lanczos_g) term, and throwing out the lanczos_g
     // subtraction below; it's probably not worth it.
     let mut r = lanczos_sum(absx).ln() - LANCZOS_G;
-    r += (absx - 0.5) * ((absx + LANCZOS_G - 0.5).ln() - 1.0);
+    let t = absx - 0.5;
+    r = mul_add(t, (absx + LANCZOS_G - 0.5).ln() - 1.0, r);
 
     if x < 0.0 {
         // Use reflection formula to get value for negative x

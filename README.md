@@ -1,7 +1,7 @@
 pymath
 ======
 
-A bit-compatible Rust implementation of Python's math library.
+A binary representation compatible Rust implementation of Python's math library.
 
 ## Overview
 

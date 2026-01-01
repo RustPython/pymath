@@ -6,10 +6,12 @@
 unsafe extern "C" {
     pub fn acos(n: f64) -> f64;
     pub fn asin(n: f64) -> f64;
+    pub fn asinh(n: f64) -> f64;
     pub fn atan(n: f64) -> f64;
     pub fn atan2(a: f64, b: f64) -> f64;
     pub fn cbrt(n: f64) -> f64;
     pub fn cbrtf(n: f32) -> f32;
+    pub fn copysign(x: f64, y: f64) -> f64;
     pub fn cosh(n: f64) -> f64;
     pub fn expm1(n: f64) -> f64;
     pub fn expm1f(n: f32) -> f32;
@@ -19,9 +21,12 @@ unsafe extern "C" {
     pub fn hypot(x: f64, y: f64) -> f64;
     #[cfg_attr(target_env = "msvc", link_name = "_hypotf")]
     pub fn hypotf(x: f32, y: f32) -> f32;
+    pub fn ldexp(x: f64, n: i32) -> f64;
+    pub fn log(n: f64) -> f64;
     pub fn log1p(n: f64) -> f64;
     pub fn log1pf(n: f32) -> f32;
     pub fn sinh(n: f64) -> f64;
+    pub fn sqrt(n: f64) -> f64;
     pub fn tan(n: f64) -> f64;
     pub fn tanh(n: f64) -> f64;
     pub fn tgamma(n: f64) -> f64;

@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, mul_add};
 use std::f64::consts::PI;
 
 const LOG_PI: f64 = 1.144729885849400174143427351353058711647;
@@ -36,14 +36,6 @@ const LANCZOS_DEN_COEFFS: [f64; LANCZOS_N] = [
     66.0,
     1.0,
 ];
-
-fn mul_add(a: f64, b: f64, c: f64) -> f64 {
-    if cfg!(feature = "mul_add") {
-        a.mul_add(b, c)
-    } else {
-        a * b + c
-    }
-}
 
 fn lanczos_sum(x: f64) -> f64 {
     let mut num = 0.0;

@@ -1,11 +1,27 @@
+#[cfg(feature = "complex")]
+pub mod cmath;
 mod err;
 mod gamma;
 mod m;
 #[cfg(test)]
 mod test;
 
+#[cfg(feature = "complex")]
+pub use cmath::{c_acos, c_asin, c_asinh, c_sqrt};
 pub use err::{Error, Result};
 pub use gamma::{gamma, lgamma};
+
+/// Fused multiply-add operation.
+/// When `mul_add` feature is enabled, uses hardware FMA instruction.
+/// Otherwise, uses separate multiply and add operations.
+#[inline(always)]
+pub(crate) fn mul_add(a: f64, b: f64, c: f64) -> f64 {
+    if cfg!(feature = "mul_add") {
+        a.mul_add(b, c)
+    } else {
+        a * b + c
+    }
+}
 
 macro_rules! libm {
     // Reset errno and handle errno when return type contains Result

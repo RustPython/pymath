@@ -7,6 +7,9 @@ license = "PSF-2.0"
 
 
 [features]
+default = ["complex"]
+complex = ["dep:num-complex"]
+
 # Do not enable this feature unless you really need it.
 # CPython didn't intend to use FMA for its math library.
 # This project uses this feature in CI to verify the code doesn't have additional bugs on aarch64-apple-darwin.
@@ -17,7 +20,8 @@ mul_add = []
 
 [dependencies]
 libc = "0.2"
+num-complex = { version = "0.4", optional = true }
 
 [dev-dependencies]
 proptest = "1.6.0"
-pyo3 = { version = "0.24", features = ["abi3"] }
+pyo3 = { version = "0.27", features = ["abi3"] }

@@ -1,17 +1,14 @@
 use crate::Error;
 use pyo3::{Python, prelude::*};
 
-pub(crate) fn unwrap<'a, T: 'a>(
-    py: Python,
-    py_v: PyResult<Bound<'a, PyAny>>,
-    v: Result<T, crate::Error>,
-) -> Option<(T, T)>
-where
-    T: PartialEq + std::fmt::Debug + FromPyObject<'a>,
-{
+pub(crate) fn unwrap<'py>(
+    py: Python<'py>,
+    py_v: PyResult<Bound<'py, PyAny>>,
+    v: Result<f64, crate::Error>,
+) -> Option<(f64, f64)> {
     match py_v {
         Ok(py_v) => {
-            let py_v: T = py_v.extract().unwrap();
+            let py_v: f64 = py_v.extract().ok().expect("failed to extract");
             Some((py_v, v.unwrap()))
         }
         Err(e) => {

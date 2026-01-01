@@ -341,13 +341,14 @@ mod tests {
 
         let rs_result = rs_func(Complex64::new(re, im));
 
-        pyo3::Python::with_gil(|py| {
+        pyo3::Python::attach(|py| {
             let cmath = pyo3::types::PyModule::import(py, "cmath").unwrap();
             let py_func = cmath.getattr(func_name).unwrap();
             let py_result = py_func.call1((pyo3::types::PyComplex::from_doubles(py, re, im),));
 
             match py_result {
                 Ok(result) => {
+                    use pyo3::types::PyComplexMethods;
                     let c = result.downcast::<pyo3::types::PyComplex>().unwrap();
                     let py_re = c.real();
                     let py_im = c.imag();
@@ -391,7 +392,6 @@ mod tests {
 
     #[test]
     fn edgetest_sqrt() {
-        pyo3::prepare_freethreaded_python();
         for &re in &EDGE_VALUES {
             for &im in &EDGE_VALUES {
                 test_sqrt(re, im);
@@ -401,7 +401,6 @@ mod tests {
 
     #[test]
     fn edgetest_asin() {
-        pyo3::prepare_freethreaded_python();
         for &re in &EDGE_VALUES {
             for &im in &EDGE_VALUES {
                 test_asin(re, im);
@@ -411,7 +410,6 @@ mod tests {
 
     #[test]
     fn edgetest_acos() {
-        pyo3::prepare_freethreaded_python();
         for &re in &EDGE_VALUES {
             for &im in &EDGE_VALUES {
                 test_acos(re, im);
@@ -421,7 +419,6 @@ mod tests {
 
     #[test]
     fn edgetest_asinh() {
-        pyo3::prepare_freethreaded_python();
         for &re in &EDGE_VALUES {
             for &im in &EDGE_VALUES {
                 test_asinh(re, im);
@@ -432,25 +429,21 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn proptest_sqrt(re: f64, im: f64) {
-            pyo3::prepare_freethreaded_python();
             test_sqrt(re, im);
         }
 
         #[test]
         fn proptest_asin(re: f64, im: f64) {
-            pyo3::prepare_freethreaded_python();
             test_asin(re, im);
         }
 
         #[test]
         fn proptest_acos(re: f64, im: f64) {
-            pyo3::prepare_freethreaded_python();
             test_acos(re, im);
         }
 
         #[test]
         fn proptest_asinh(re: f64, im: f64) {
-            pyo3::prepare_freethreaded_python();
             test_asinh(re, im);
         }
     }

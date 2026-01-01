@@ -50,8 +50,7 @@ macro_rules! pyo3_proptest {
 
             let rs_result = $fn_name(x);
 
-            pyo3::prepare_freethreaded_python();
-            Python::with_gil(|py| {
+            pyo3::Python::attach(|py| {
                 let math = PyModule::import(py, "math").unwrap();
                 let py_func = math
                     .getattr(stringify!($fn_name))
@@ -76,8 +75,7 @@ macro_rules! pyo3_proptest {
 
             let rs_result = Ok($fn_name(x));
 
-            pyo3::prepare_freethreaded_python();
-            Python::with_gil(|py| {
+            pyo3::Python::attach(|py| {
                 let math = PyModule::import(py, "math").unwrap();
                 let py_func = math
                     .getattr(stringify!($fn_name))

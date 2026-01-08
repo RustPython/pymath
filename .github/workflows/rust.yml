@@ -43,3 +43,7 @@ jobs:
     - name: Run tests with FMA (macOS)
       if: matrix.os == 'macos-latest'
       run: cargo test --verbose --features mul_add && cargo test --release --verbose --features mul_add
+    - name: Run tests with num-bigint
+      run: cargo test --verbose --features num-bigint
+    - name: Run tests with malachite-bigint
+      run: cargo test --verbose --features malachite-bigint

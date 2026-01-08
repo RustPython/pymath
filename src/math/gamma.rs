@@ -1,11 +1,28 @@
-use crate::Error;
+//! Special functions: gamma, lgamma, erf, erfc.
+
+use crate::{Error, mul_add};
 use std::f64::consts::PI;
+
+/// Error function.
+#[inline]
+pub fn erf(x: f64) -> crate::Result<f64> {
+    super::math_1a(x, crate::m::erf)
+}
+
+/// Complementary error function.
+#[inline]
+pub fn erfc(x: f64) -> crate::Result<f64> {
+    super::math_1a(x, crate::m::erfc)
+}
 
 const LOG_PI: f64 = 1.144729885849400174143427351353058711647;
 
 const LANCZOS_N: usize = 13;
+#[allow(clippy::excessive_precision)]
 const LANCZOS_G: f64 = 6.024680040776729583740234375;
+#[allow(clippy::excessive_precision)]
 const LANCZOS_G_MINUS_HALF: f64 = 5.524680040776729583740234375;
+#[allow(clippy::excessive_precision)]
 const LANCZOS_NUM_COEFFS: [f64; LANCZOS_N] = [
     23531376880.410759688572007674451636754734846804940,
     42919803642.649098768957899047001988850926355848959,
@@ -36,14 +53,6 @@ const LANCZOS_DEN_COEFFS: [f64; LANCZOS_N] = [
     66.0,
     1.0,
 ];
-
-fn mul_add(a: f64, b: f64, c: f64) -> f64 {
-    if cfg!(feature = "mul_add") {
-        a.mul_add(b, c)
-    } else {
-        a * b + c
-    }
-}
 
 fn lanczos_sum(x: f64) -> f64 {
     let mut num = 0.0;
@@ -206,9 +215,9 @@ pub fn gamma(x: f64) -> crate::Result<f64> {
         r
     };
     if r.is_infinite() {
-        return Err((f64::INFINITY, Error::ERANGE).1);
+        Err((f64::INFINITY, Error::ERANGE).1)
     } else {
-        return Ok(r);
+        Ok(r)
     }
 }
 
@@ -259,10 +268,12 @@ pub fn lgamma(x: f64) -> crate::Result<f64> {
     Ok(r)
 }
 
-super::pyo3_proptest!(gamma(Result<_>), test_gamma, proptest_gamma, fulltest_gamma);
-super::pyo3_proptest!(
+crate::pyo3_proptest!(gamma(Result<_>), test_gamma, proptest_gamma, fulltest_gamma);
+crate::pyo3_proptest!(
     lgamma(Result<_>),
     test_lgamma,
     proptest_lgamma,
     fulltest_lgamma
 );
+crate::pyo3_proptest!(erf(Result<_>), test_erf, proptest_erf, fulltest_erf);
+crate::pyo3_proptest!(erfc(Result<_>), test_erfc, proptest_erfc, fulltest_erfc);

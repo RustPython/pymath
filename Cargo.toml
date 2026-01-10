@@ -7,8 +7,8 @@ license = "PSF-2.0"
 
 
 [features]
-default = ["mul_add"]
-# complex = ["dep:num-complex"]
+default = ["complex"]
+complex = ["dep:num-complex"]
 num-bigint = ["_bigint", "dep:num-bigint"]
 malachite-bigint = ["_bigint", "dep:malachite-bigint"]
 _bigint = ["dep:num-traits", "dep:num-integer"]  # Internal feature. User must use num-bigint or malachite-bigint instead.

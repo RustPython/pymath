@@ -1,4 +1,6 @@
 // Public modules
+#[cfg(feature = "complex")]
+pub mod cmath;
 pub mod math;
 
 // Internal modules

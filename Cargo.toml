@@ -1,8 +1,10 @@
 [package]
 name = "pymath"
+author = "Jeong, YunWon <jeong@youknowone.org>"
+repository = "https://github.com/RustPython/pymath"
+description = "A binary representation compatible Rust implementation of Python's math library."
 version = "0.1.0"
 edition = "2024"
-description = "A binary representation compatible Rust implementation of Python's math library."
 license = "PSF-2.0"
 
 

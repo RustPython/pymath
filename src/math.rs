@@ -96,17 +96,33 @@ pub(crate) fn math_1a(x: f64, func: fn(f64) -> f64) -> crate::Result<f64> {
     crate::err::is_error(r)
 }
 
-/// Return the Euclidean distance, sqrt(x*x + y*y).
+/// Return the Euclidean norm of n-dimensional coordinates.
 ///
-/// Uses high-precision vector_norm algorithm instead of libm hypot()
-/// for consistent results across platforms and better handling of overflow/underflow.
+/// Equivalent to sqrt(sum(x**2 for x in coords)).
+/// Uses high-precision vector_norm algorithm for consistent results
+/// across platforms and better handling of overflow/underflow.
 #[inline]
-pub fn hypot(x: f64, y: f64) -> f64 {
-    let ax = x.abs();
-    let ay = y.abs();
-    let max = if ax > ay { ax } else { ay };
-    let found_nan = x.is_nan() || y.is_nan();
-    aggregate::vector_norm_2(ax, ay, max, found_nan)
+pub fn hypot(coords: &[f64]) -> f64 {
+    let n = coords.len();
+    if n == 0 {
+        return 0.0;
+    }
+
+    let mut max = 0.0_f64;
+    let mut found_nan = false;
+    let abs_coords: Vec<f64> = coords
+        .iter()
+        .map(|&x| {
+            let ax = x.abs();
+            found_nan |= ax.is_nan();
+            if ax > max {
+                max = ax;
+            }
+            ax
+        })
+        .collect();
+
+    aggregate::vector_norm(&abs_coords, max, found_nan)
 }
 
 // Mathematical constants
@@ -208,16 +224,43 @@ mod tests {
         assert!(NAN.is_nan());
     }
 
-    // hypot tests
-    fn test_hypot(x: f64, y: f64) {
-        crate::test::test_math_2(x, y, "hypot", |x, y| Ok(hypot(x, y)));
+    // hypot tests - n-dimensional
+    fn test_hypot(coords: &[f64]) {
+        let rs_result = hypot(coords);
+
+        pyo3::Python::attach(|py| {
+            let math = PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("hypot").unwrap();
+            let py_args = pyo3::types::PyTuple::new(py, coords).unwrap();
+            let py_result: f64 = py_func.call1(py_args).unwrap().extract().unwrap();
+
+            if py_result.is_nan() && rs_result.is_nan() {
+                return;
+            }
+            assert_eq!(
+                py_result.to_bits(),
+                rs_result.to_bits(),
+                "hypot({:?}): py={} vs rs={}",
+                coords,
+                py_result,
+                rs_result
+            );
+        });
+    }
+
+    #[test]
+    fn test_hypot_basic() {
+        test_hypot(&[3.0, 4.0]); // 5.0
+        test_hypot(&[1.0, 2.0, 2.0]); // 3.0
+        test_hypot(&[]); // 0.0
+        test_hypot(&[5.0]); // 5.0
     }
 
     #[test]
     fn edgetest_hypot() {
         for &x in &crate::test::EDGE_VALUES {
             for &y in &crate::test::EDGE_VALUES {
-                test_hypot(x, y);
+                test_hypot(&[x, y]);
             }
         }
     }
@@ -235,7 +278,7 @@ mod tests {
 
         #[test]
         fn proptest_hypot(x: f64, y: f64) {
-            test_hypot(x, y);
+            test_hypot(&[x, y]);
         }
     }
 }

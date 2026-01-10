@@ -11,23 +11,43 @@ use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
 use num_traits::{One, Signed, ToPrimitive, Zero};
 
-/// Return the greatest common divisor of a and b.
+/// Return the greatest common divisor of the integer arguments.
 ///
-/// Uses the optimized GCD implementation from num-integer,
+/// gcd() with no arguments returns 0.
+/// gcd(a) returns abs(a).
 #[inline]
-pub fn gcd(a: &BigInt, b: &BigInt) -> BigInt {
-    a.gcd(b)
-}
-
-/// Return the least common multiple of a and b.
-#[inline]
-pub fn lcm(a: &BigInt, b: &BigInt) -> BigInt {
-    if a.is_zero() || b.is_zero() {
+pub fn gcd(args: &[BigInt]) -> BigInt {
+    if args.is_empty() {
         return BigInt::zero();
     }
-    let g = gcd(a, b);
-    let f = a / &g;
-    (&f * b).abs()
+    let mut result = args[0].abs();
+    for arg in &args[1..] {
+        result = result.gcd(arg);
+        if result.is_one() {
+            return result;
+        }
+    }
+    result
+}
+
+/// Return the least common multiple of the integer arguments.
+///
+/// lcm() with no arguments returns 1.
+/// lcm(a) returns abs(a).
+#[inline]
+pub fn lcm(args: &[BigInt]) -> BigInt {
+    if args.is_empty() {
+        return BigInt::one();
+    }
+    let mut result = args[0].abs();
+    for arg in &args[1..] {
+        if result.is_zero() || arg.is_zero() {
+            return BigInt::zero();
+        }
+        let g = result.gcd(arg);
+        result = result / &g * arg.abs();
+    }
+    result
 }
 
 /// Approximate square roots for 16-bit integers.
@@ -62,10 +82,22 @@ fn approximate_isqrt(n: u64) -> u32 {
     (u << 15) + ((n >> 17) / u as u64) as u32
 }
 
+/// Return the integer part of the square root of a non-negative integer.
+///
+/// Returns Err if n is negative.
+pub fn isqrt(n: &BigInt) -> Result<BigInt, ()> {
+    if n.is_negative() {
+        return Err(());
+    }
+    Ok(isqrt_unsigned(&n.magnitude()).into())
+}
+
 /// Return the integer part of the square root of the input.
 ///
 /// This is an adaptive-precision pure-integer version of Newton's iteration.
-pub fn isqrt(n: &BigUint) -> BigUint {
+///
+/// TODO: regard to expose as public API
+fn isqrt_unsigned(n: &BigUint) -> BigUint {
     if n.is_zero() {
         return BigUint::zero();
     }
@@ -213,18 +245,23 @@ fn factorial_odd_part(n: u64) -> BigUint {
 
 /// Return n factorial (n!).
 ///
+/// Returns Err(()) if n is negative.
 /// Uses the divide-and-conquer algorithm.
 /// Based on: http://www.luschny.de/math/factorial/binarysplitfact.html
-pub fn factorial(n: u64) -> BigUint {
+pub fn factorial(n: i64) -> Result<BigUint, ()> {
+    if n < 0 {
+        return Err(());
+    }
+    let n = n as u64;
     // Use lookup table for small values
     if n < SMALL_FACTORIALS.len() as u64 {
-        return BigUint::from(SMALL_FACTORIALS[n as usize]);
+        return Ok(BigUint::from(SMALL_FACTORIALS[n as usize]));
     }
 
     // Express as odd_part * 2**two_valuation
     let odd_part = factorial_odd_part(n);
     let two_valuation = n - count_set_bits(n);
-    odd_part << two_valuation as usize
+    Ok(odd_part << two_valuation as usize)
 }
 
 // COMB / PERM
@@ -393,7 +430,7 @@ const INVERTED_FACTORIAL_ODD_PART: [u64; 128] = [
     0x2b3e690621a42251,
     0x4f520f00e03c04e7,
     0x2edf84ee600211d3,
-    0xadcaa2764aaacffd,
+    0xadcaa2764aaacdfd,
     0x161f4f9033f4fe63,
     0x161f4f9033f4fe63,
     0xbada2932ea4d3e03,
@@ -652,11 +689,16 @@ fn perm_comb(n: &BigUint, k: u64, is_comb: bool) -> BigUint {
 
 /// Return the number of ways to choose k items from n items (n choose k).
 ///
+/// Returns Err(()) if n or k is negative.
 /// Evaluates to n! / (k! * (n - k)!) when k <= n and evaluates
 /// to zero when k > n.
-pub fn comb(n: u64, k: u64) -> BigUint {
+pub fn comb(n: i64, k: i64) -> Result<BigUint, ()> {
+    if n < 0 || k < 0 {
+        return Err(());
+    }
+    let (n, k) = (n as u64, k as u64);
     if k > n {
-        return BigUint::zero();
+        return Ok(BigUint::zero());
     }
 
     // Use smaller k for efficiency
@@ -664,107 +706,378 @@ pub fn comb(n: u64, k: u64) -> BigUint {
 
     if k <= 1 {
         if k == 0 {
-            return BigUint::one();
+            return Ok(BigUint::one());
         }
-        return BigUint::from(n);
+        return Ok(BigUint::from(n));
     }
 
-    perm_comb_small(n, k, true)
+    Ok(perm_comb_small(n, k, true))
 }
 
 /// Return the number of ways to arrange k items from n items.
 ///
+/// Returns Err(()) if n or k is negative.
 /// Evaluates to n! / (n - k)! when k <= n and evaluates
 /// to zero when k > n.
 ///
 /// If k is not specified (None), then k defaults to n
 /// and the function returns n!.
-pub fn perm(n: u64, k: Option<u64>) -> BigUint {
-    let k = k.unwrap_or(n);
+pub fn perm(n: i64, k: Option<i64>) -> Result<BigUint, ()> {
+    if n < 0 {
+        return Err(());
+    }
+    let n = n as u64;
+    let k = match k {
+        Some(k) if k < 0 => return Err(()),
+        Some(k) => k as u64,
+        None => n,
+    };
     if k > n {
-        return BigUint::zero();
+        return Ok(BigUint::zero());
     }
 
     if k == 0 {
-        return BigUint::one();
+        return Ok(BigUint::one());
     }
     if k == 1 {
-        return BigUint::from(n);
+        return Ok(BigUint::from(n));
     }
 
-    perm_comb_small(n, k, false)
+    Ok(perm_comb_small(n, k, false))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn test_gcd_impl(args: &[i64]) {
+        use pyo3::prelude::*;
+
+        let bigints: Vec<BigInt> = args.iter().map(|&x| BigInt::from(x)).collect();
+        let rs_result = gcd(&bigints);
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("gcd").unwrap();
+            let py_args = pyo3::types::PyTuple::new(py, args).unwrap();
+            let py_result: i64 = py_func.call1(py_args).unwrap().extract().unwrap();
+
+            assert_eq!(
+                rs_result,
+                BigInt::from(py_result),
+                "gcd({:?}): py={} vs rs={}",
+                args,
+                py_result,
+                rs_result
+            );
+        });
+    }
+
+    fn test_lcm_impl(args: &[i64]) {
+        use pyo3::prelude::*;
+
+        let bigints: Vec<BigInt> = args.iter().map(|&x| BigInt::from(x)).collect();
+        let rs_result = lcm(&bigints);
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("lcm").unwrap();
+            let py_args = pyo3::types::PyTuple::new(py, args).unwrap();
+            let py_result: i64 = py_func.call1(py_args).unwrap().extract().unwrap();
+
+            assert_eq!(
+                rs_result,
+                BigInt::from(py_result),
+                "lcm({:?}): py={} vs rs={}",
+                args,
+                py_result,
+                rs_result
+            );
+        });
+    }
+
+    fn test_isqrt_impl(n: i64) {
+        use pyo3::prelude::*;
+
+        let rs_result = isqrt(&BigInt::from(n));
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("isqrt").unwrap();
+            let py_result = py_func.call1((n,));
+
+            match py_result {
+                Ok(result) => {
+                    let py_val: i64 = result.extract().unwrap();
+                    assert_eq!(
+                        rs_result,
+                        Ok(BigInt::from(py_val)),
+                        "isqrt({}): py={} vs rs={:?}",
+                        n,
+                        py_val,
+                        rs_result
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs_result.is_err(),
+                        "isqrt({}): py raised error but rs={:?}",
+                        n,
+                        rs_result
+                    );
+                }
+            }
+        });
+    }
+
+    fn test_factorial_impl(n: i64) {
+        use pyo3::prelude::*;
+        use std::str::FromStr;
+
+        let rs_result = factorial(n);
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("factorial").unwrap();
+            let py_result = py_func.call1((n,));
+
+            match py_result {
+                Ok(result) => {
+                    let py_str: String = result.str().unwrap().extract().unwrap();
+                    let py_val = BigUint::from_str(&py_str).unwrap();
+                    assert_eq!(
+                        rs_result,
+                        Ok(py_val.clone()),
+                        "factorial({}): py={} vs rs={:?}",
+                        n,
+                        py_val,
+                        rs_result
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs_result.is_err(),
+                        "factorial({}): py raised error but rs={:?}",
+                        n,
+                        rs_result
+                    );
+                }
+            }
+        });
+    }
+
+    fn test_comb_impl(n: i64, k: i64) {
+        use pyo3::prelude::*;
+        use std::str::FromStr;
+
+        let rs_result = comb(n, k);
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("comb").unwrap();
+            let py_result = py_func.call1((n, k));
+
+            match py_result {
+                Ok(result) => {
+                    let py_str: String = result.str().unwrap().extract().unwrap();
+                    let py_val = BigUint::from_str(&py_str).unwrap();
+                    assert_eq!(
+                        rs_result,
+                        Ok(py_val.clone()),
+                        "comb({}, {}): py={} vs rs={:?}",
+                        n,
+                        k,
+                        py_val,
+                        rs_result
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs_result.is_err(),
+                        "comb({}, {}): py raised error but rs={:?}",
+                        n,
+                        k,
+                        rs_result
+                    );
+                }
+            }
+        });
+    }
+
+    fn test_perm_impl(n: i64, k: Option<i64>) {
+        use pyo3::prelude::*;
+        use std::str::FromStr;
+
+        let rs_result = perm(n, k);
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("perm").unwrap();
+            let py_result = match k {
+                Some(k) => py_func.call1((n, k)),
+                None => py_func.call1((n,)),
+            };
+
+            match py_result {
+                Ok(result) => {
+                    let py_str: String = result.str().unwrap().extract().unwrap();
+                    let py_val = BigUint::from_str(&py_str).unwrap();
+                    assert_eq!(
+                        rs_result,
+                        Ok(py_val.clone()),
+                        "perm({}, {:?}): py={} vs rs={:?}",
+                        n,
+                        k,
+                        py_val,
+                        rs_result
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs_result.is_err(),
+                        "perm({}, {:?}): py raised error but rs={:?}",
+                        n,
+                        k,
+                        rs_result
+                    );
+                }
+            }
+        });
+    }
+
     #[test]
     fn test_gcd() {
-        assert_eq!(gcd(&12.into(), &8.into()), 4.into());
-        assert_eq!(gcd(&8.into(), &12.into()), 4.into());
-        assert_eq!(gcd(&0.into(), &5.into()), 5.into());
-        assert_eq!(gcd(&5.into(), &0.into()), 5.into());
-        assert_eq!(gcd(&0.into(), &0.into()), 0.into());
-        assert_eq!(gcd(&(-12).into(), &8.into()), 4.into());
-        assert_eq!(gcd(&12.into(), &(-8).into()), 4.into());
-        assert_eq!(gcd(&(-12).into(), &(-8).into()), 4.into());
-        assert_eq!(gcd(&17.into(), &13.into()), 1.into());
+        // No arguments
+        test_gcd_impl(&[]);
+        // Single argument
+        test_gcd_impl(&[5]);
+        test_gcd_impl(&[-5]);
+        test_gcd_impl(&[0]);
+        // Two arguments
+        test_gcd_impl(&[12, 8]);
+        test_gcd_impl(&[8, 12]);
+        test_gcd_impl(&[0, 5]);
+        test_gcd_impl(&[5, 0]);
+        test_gcd_impl(&[0, 0]);
+        test_gcd_impl(&[-12, 8]);
+        test_gcd_impl(&[12, -8]);
+        test_gcd_impl(&[-12, -8]);
+        test_gcd_impl(&[17, 13]);
+        // Multiple arguments
+        test_gcd_impl(&[12, 8, 4]);
+        test_gcd_impl(&[12, 8, 6]);
+        test_gcd_impl(&[100, 150, 200, 250]);
     }
 
     #[test]
     fn test_lcm() {
-        assert_eq!(lcm(&12.into(), &8.into()), 24.into());
-        assert_eq!(lcm(&8.into(), &12.into()), 24.into());
-        assert_eq!(lcm(&0.into(), &5.into()), 0.into());
-        assert_eq!(lcm(&5.into(), &0.into()), 0.into());
-        assert_eq!(lcm(&0.into(), &0.into()), 0.into());
-        assert_eq!(lcm(&(-12).into(), &8.into()), 24.into());
-        assert_eq!(lcm(&12.into(), &(-8).into()), 24.into());
-        assert_eq!(lcm(&17.into(), &13.into()), 221.into());
+        // No arguments
+        test_lcm_impl(&[]);
+        // Single argument
+        test_lcm_impl(&[5]);
+        test_lcm_impl(&[-5]);
+        // Two arguments
+        test_lcm_impl(&[12, 8]);
+        test_lcm_impl(&[8, 12]);
+        test_lcm_impl(&[0, 5]);
+        test_lcm_impl(&[5, 0]);
+        test_lcm_impl(&[0, 0]);
+        test_lcm_impl(&[-12, 8]);
+        test_lcm_impl(&[12, -8]);
+        test_lcm_impl(&[17, 13]);
+        // Multiple arguments
+        test_lcm_impl(&[2, 3, 4]);
+        test_lcm_impl(&[6, 8, 12]);
     }
 
     #[test]
     fn test_isqrt() {
-        assert_eq!(isqrt(&BigUint::from(0u32)), BigUint::from(0u32));
-        assert_eq!(isqrt(&BigUint::from(1u32)), BigUint::from(1u32));
-        assert_eq!(isqrt(&BigUint::from(4u32)), BigUint::from(2u32));
-        assert_eq!(isqrt(&BigUint::from(9u32)), BigUint::from(3u32));
-        assert_eq!(isqrt(&BigUint::from(10u32)), BigUint::from(3u32));
-        assert_eq!(isqrt(&BigUint::from(15u32)), BigUint::from(3u32));
-        assert_eq!(isqrt(&BigUint::from(16u32)), BigUint::from(4u32));
-        assert_eq!(isqrt(&BigUint::from(100u32)), BigUint::from(10u32));
-        assert_eq!(isqrt(&BigUint::from(1000000u32)), BigUint::from(1000u32));
-        // Test large number
-        let large = BigUint::from(10u64).pow(40);
-        assert_eq!(isqrt(&large), BigUint::from(10u64).pow(20));
+        test_isqrt_impl(0);
+        test_isqrt_impl(1);
+        test_isqrt_impl(4);
+        test_isqrt_impl(9);
+        test_isqrt_impl(10);
+        test_isqrt_impl(15);
+        test_isqrt_impl(16);
+        test_isqrt_impl(100);
+        test_isqrt_impl(1000000);
+        test_isqrt_impl(-1);
+        test_isqrt_impl(-100);
     }
 
     #[test]
     fn test_factorial() {
-        assert_eq!(factorial(0), BigUint::from(1u32));
-        assert_eq!(factorial(1), BigUint::from(1u32));
-        assert_eq!(factorial(5), BigUint::from(120u32));
-        assert_eq!(factorial(10), BigUint::from(3628800u32));
-        assert_eq!(factorial(20), BigUint::from(2432902008176640000u64));
+        test_factorial_impl(0);
+        test_factorial_impl(1);
+        test_factorial_impl(5);
+        test_factorial_impl(10);
+        test_factorial_impl(20);
+        test_factorial_impl(50);
+        test_factorial_impl(100);
+        test_factorial_impl(-1);
+        test_factorial_impl(-10);
     }
 
     #[test]
     fn test_comb() {
-        assert_eq!(comb(5, 0), BigUint::from(1u32));
-        assert_eq!(comb(5, 5), BigUint::from(1u32));
-        assert_eq!(comb(5, 2), BigUint::from(10u32));
-        assert_eq!(comb(10, 3), BigUint::from(120u32));
-        assert_eq!(comb(3, 5), BigUint::from(0u32)); // k > n
-        assert_eq!(comb(100, 30), comb(100, 70)); // symmetry: C(n, k) == C(n, n-k)
+        test_comb_impl(5, 0);
+        test_comb_impl(5, 5);
+        test_comb_impl(5, 2);
+        test_comb_impl(10, 3);
+        test_comb_impl(3, 5); // k > n
+        test_comb_impl(100, 30);
+        test_comb_impl(100, 70);
+        test_comb_impl(-1, 0);
+        test_comb_impl(5, -1);
+        test_comb_impl(-5, -3);
     }
 
     #[test]
     fn test_perm() {
-        assert_eq!(perm(5, Some(0)), BigUint::from(1u32));
-        assert_eq!(perm(5, Some(5)), BigUint::from(120u32));
-        assert_eq!(perm(5, Some(2)), BigUint::from(20u32));
-        assert_eq!(perm(5, None), BigUint::from(120u32)); // 5!
-        assert_eq!(perm(3, Some(5)), BigUint::from(0u32)); // k > n
+        test_perm_impl(5, Some(0));
+        test_perm_impl(5, Some(5));
+        test_perm_impl(5, Some(2));
+        test_perm_impl(5, None); // 5!
+        test_perm_impl(3, Some(5)); // k > n
+        test_perm_impl(10, Some(3));
+        test_perm_impl(20, None);
+        test_perm_impl(-1, None);
+        test_perm_impl(5, Some(-1));
+        test_perm_impl(-5, Some(-3));
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn proptest_gcd_2(a: i64, b: i64) {
+            test_gcd_impl(&[a, b]);
+        }
+
+        #[test]
+        fn proptest_lcm_2(a: i64, b: i64) {
+            // Avoid large lcm values that overflow i64
+            let a = a % 10000;
+            let b = b % 10000;
+            test_lcm_impl(&[a, b]);
+        }
+
+        #[test]
+        fn proptest_isqrt(n in 0i64..1000000i64) {
+            test_isqrt_impl(n);
+        }
+
+        #[test]
+        fn proptest_factorial(n in -10i64..30i64) {
+            test_factorial_impl(n);
+        }
+
+        #[test]
+        fn proptest_comb(n in -10i64..50i64, k in -10i64..50i64) {
+            test_comb_impl(n, k);
+        }
+
+        #[test]
+        fn proptest_perm(n in -10i64..20i64, k in -10i64..20i64) {
+            test_perm_impl(n, Some(k));
+        }
     }
 }

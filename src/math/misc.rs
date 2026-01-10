@@ -43,9 +43,12 @@ pub fn isnan(x: f64) -> bool {
 /// given absolute and relative tolerances:
 /// `abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)`
 ///
+/// Default tolerances: rel_tol = 1e-09, abs_tol = 0.0
 /// Returns Err(EDOM) if rel_tol or abs_tol is negative.
 #[inline]
-pub fn isclose(a: f64, b: f64, rel_tol: f64, abs_tol: f64) -> Result<bool> {
+pub fn isclose(a: f64, b: f64, rel_tol: Option<f64>, abs_tol: Option<f64>) -> Result<bool> {
+    let rel_tol = rel_tol.unwrap_or(1e-09);
+    let abs_tol = abs_tol.unwrap_or(0.0);
     // Tolerances must be non-negative
     if rel_tol < 0.0 || abs_tol < 0.0 {
         return Err(Error::EDOM);
@@ -377,7 +380,7 @@ mod tests {
     fn test_isclose_impl(a: f64, b: f64, rel_tol: f64, abs_tol: f64) {
         use pyo3::prelude::*;
 
-        let rs_result = isclose(a, b, rel_tol, abs_tol);
+        let rs_result = isclose(a, b, Some(rel_tol), Some(abs_tol));
 
         pyo3::Python::attach(|py| {
             let math = pyo3::types::PyModule::import(py, "math").unwrap();

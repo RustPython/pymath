@@ -11,24 +11,26 @@ env:
 
 jobs:
   build:
-    name: Build and test
+    name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [
-          ubuntu-latest,
-          windows-latest,
-          macos-latest,
-        ]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable]
+        include:
+          - os: ubuntu-latest
+            features: complex
+          - os: windows-latest
+            features: complex
+          - os: macos-latest
+            features: complex,mul_add
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.13"
-        check-latest: true
+        python-version: "3.14"
     - name: Setup Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -37,13 +39,9 @@ jobs:
         override: true
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
-      if: matrix.os != 'macos-latest'
-      run: cargo test --verbose && cargo test --release --verbose
-    - name: Run tests with FMA (macOS)
-      if: matrix.os == 'macos-latest'
-      run: cargo test --verbose --features mul_add && cargo test --release --verbose --features mul_add
     - name: Run tests with num-bigint
-      run: cargo test --verbose --features num-bigint
+      run: cargo test --verbose --features ${{ matrix.features }},num-bigint
+    - name: Run tests with num-bigint (Release)
+      run: cargo test --verbose --features ${{ matrix.features }},num-bigint --release
     - name: Run tests with malachite-bigint
-      run: cargo test --verbose --features malachite-bigint
+      run: cargo test --verbose --features ${{ matrix.features }},malachite-bigint

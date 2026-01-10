@@ -1,6 +1,6 @@
 [package]
 name = "pymath"
-version = "0.0.3"
+version = "0.1.0"
 edition = "2024"
 description = "A binary representation compatible Rust implementation of Python's math library."
 license = "PSF-2.0"

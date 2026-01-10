@@ -98,22 +98,38 @@ pub fn abs(z: Complex64) -> f64 {
 }
 
 /// Determine whether two complex numbers are close in value.
+///
+/// Default tolerances: rel_tol = 1e-09, abs_tol = 0.0
+/// Returns Err(EDOM) if rel_tol or abs_tol is negative.
 #[inline]
-pub fn isclose(a: Complex64, b: Complex64, rel_tol: f64, abs_tol: f64) -> bool {
+pub fn isclose(
+    a: Complex64,
+    b: Complex64,
+    rel_tol: Option<f64>,
+    abs_tol: Option<f64>,
+) -> Result<bool> {
+    let rel_tol = rel_tol.unwrap_or(1e-09);
+    let abs_tol = abs_tol.unwrap_or(0.0);
+
+    // Tolerances must be non-negative
+    if rel_tol < 0.0 || abs_tol < 0.0 {
+        return Err(Error::EDOM);
+    }
+
     // short circuit exact equality
     if a.re == b.re && a.im == b.im {
-        return true;
+        return Ok(true);
     }
 
     // This catches the case of two infinities of opposite sign, or
     // one infinity and one finite number.
     if a.re.is_infinite() || a.im.is_infinite() || b.re.is_infinite() || b.im.is_infinite() {
-        return false;
+        return Ok(false);
     }
 
     // now do the regular computation
     let diff = abs(Complex64::new(a.re - b.re, a.im - b.im));
-    (diff <= rel_tol * abs(b)) || (diff <= rel_tol * abs(a)) || (diff <= abs_tol)
+    Ok((diff <= rel_tol * abs(b)) || (diff <= rel_tol * abs(a)) || (diff <= abs_tol))
 }
 
 #[cfg(test)]
@@ -315,39 +331,64 @@ mod tests {
     #[test]
     fn test_isclose_basic() {
         // Equal values
-        assert!(isclose(
-            Complex64::new(1.0, 2.0),
-            Complex64::new(1.0, 2.0),
-            1e-9,
-            0.0
-        ));
+        assert_eq!(
+            isclose(
+                Complex64::new(1.0, 2.0),
+                Complex64::new(1.0, 2.0),
+                Some(1e-9),
+                Some(0.0)
+            ),
+            Ok(true)
+        );
         // Close values
-        assert!(isclose(
-            Complex64::new(1.0, 2.0),
-            Complex64::new(1.0 + 1e-10, 2.0),
-            1e-9,
-            0.0
-        ));
+        assert_eq!(
+            isclose(
+                Complex64::new(1.0, 2.0),
+                Complex64::new(1.0 + 1e-10, 2.0),
+                Some(1e-9),
+                Some(0.0)
+            ),
+            Ok(true)
+        );
         // Not close
-        assert!(!isclose(
-            Complex64::new(1.0, 2.0),
-            Complex64::new(2.0, 2.0),
-            1e-9,
-            0.0
-        ));
+        assert_eq!(
+            isclose(
+                Complex64::new(1.0, 2.0),
+                Complex64::new(2.0, 2.0),
+                Some(1e-9),
+                Some(0.0)
+            ),
+            Ok(false)
+        );
         // Infinities
-        assert!(isclose(
-            Complex64::new(f64::INFINITY, 0.0),
-            Complex64::new(f64::INFINITY, 0.0),
-            1e-9,
-            0.0
-        ));
-        assert!(!isclose(
-            Complex64::new(f64::INFINITY, 0.0),
-            Complex64::new(f64::NEG_INFINITY, 0.0),
-            1e-9,
-            0.0
-        ));
+        assert_eq!(
+            isclose(
+                Complex64::new(f64::INFINITY, 0.0),
+                Complex64::new(f64::INFINITY, 0.0),
+                Some(1e-9),
+                Some(0.0)
+            ),
+            Ok(true)
+        );
+        assert_eq!(
+            isclose(
+                Complex64::new(f64::INFINITY, 0.0),
+                Complex64::new(f64::NEG_INFINITY, 0.0),
+                Some(1e-9),
+                Some(0.0)
+            ),
+            Ok(false)
+        );
+        // Negative tolerance
+        assert!(
+            isclose(
+                Complex64::new(1.0, 2.0),
+                Complex64::new(1.0, 2.0),
+                Some(-1.0),
+                Some(0.0)
+            )
+            .is_err()
+        );
     }
 
     proptest::proptest! {

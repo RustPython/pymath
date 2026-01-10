@@ -170,80 +170,8 @@ pub fn fsum(iter: impl IntoIterator<Item = f64>) -> crate::Result<f64> {
 
 // VECTOR_NORM - for dist and hypot
 
-/// Compute the Euclidean norm of two values with high precision.
-/// Optimized version for hypot(x, y).
-pub(super) fn vector_norm_2(x: f64, y: f64, max: f64, found_nan: bool) -> f64 {
-    // Check for infinity first (inf wins over nan)
-    if x.is_infinite() || y.is_infinite() {
-        return f64::INFINITY;
-    }
-    if found_nan {
-        return f64::NAN;
-    }
-    if max == 0.0 {
-        return 0.0;
-    }
-    // n == 1 case: only one non-zero value
-    if x == 0.0 || y == 0.0 {
-        return max;
-    }
-
-    let mut max_e: i32 = 0;
-    crate::m::frexp(max, &mut max_e);
-
-    if max_e < -1023 {
-        // When max_e < -1023, ldexp(1.0, -max_e) would overflow
-        return f64::MIN_POSITIVE
-            * vector_norm_2(
-                x / f64::MIN_POSITIVE,
-                y / f64::MIN_POSITIVE,
-                max / f64::MIN_POSITIVE,
-                found_nan,
-            );
-    }
-
-    let scale = crate::m::ldexp(1.0, -max_e);
-    debug_assert!(max * scale >= 0.5);
-    debug_assert!(max * scale < 1.0);
-
-    let mut csum = 1.0;
-    let mut frac1 = 0.0;
-    let mut frac2 = 0.0;
-
-    // Process x
-    let xs = x * scale;
-    debug_assert!(xs.abs() < 1.0);
-    let pr = dl_mul(xs, xs);
-    debug_assert!(pr.hi <= 1.0);
-    let sm = dl_fast_sum(csum, pr.hi);
-    csum = sm.hi;
-    frac1 += pr.lo;
-    frac2 += sm.lo;
-
-    // Process y
-    let ys = y * scale;
-    debug_assert!(ys.abs() < 1.0);
-    let pr = dl_mul(ys, ys);
-    debug_assert!(pr.hi <= 1.0);
-    let sm = dl_fast_sum(csum, pr.hi);
-    csum = sm.hi;
-    frac1 += pr.lo;
-    frac2 += sm.lo;
-
-    let mut h = (csum - 1.0 + (frac1 + frac2)).sqrt();
-    let pr = dl_mul(-h, h);
-    let sm = dl_fast_sum(csum, pr.hi);
-    csum = sm.hi;
-    frac1 += pr.lo;
-    frac2 += sm.lo;
-    let x = csum - 1.0 + (frac1 + frac2);
-    h += x / (2.0 * h); // differential correction
-
-    h / scale
-}
-
 /// Compute the Euclidean norm of a vector with high precision.
-fn vector_norm(vec: &[f64], max: f64, found_nan: bool) -> f64 {
+pub fn vector_norm(vec: &[f64], max: f64, found_nan: bool) -> f64 {
     let n = vec.len();
 
     if max.is_infinite() {

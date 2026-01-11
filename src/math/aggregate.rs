@@ -259,7 +259,7 @@ pub fn dist(p: &[f64], q: &[f64]) -> f64 {
     vector_norm(&diffs, max, found_nan)
 }
 
-/// Return the sum of products of values from two sequences.
+/// Return the sum of products of values from two sequences (float version).
 ///
 /// Uses TripleLength arithmetic for high precision.
 /// Equivalent to sum(p[i] * q[i] for i in range(len(p))).
@@ -281,7 +281,25 @@ pub fn sumprod(p: &[f64], q: &[f64]) -> f64 {
     tl_to_d(flt_total)
 }
 
-/// Return the product of all elements in the iterable.
+/// Return the sum of products of values from two sequences (integer version).
+///
+/// Uses checked arithmetic to detect overflow.
+/// Returns None if overflow occurs during computation.
+/// Equivalent to sum(p[i] * q[i] for i in range(len(p))).
+pub fn sumprod_int(p: &[i64], q: &[i64]) -> Option<i64> {
+    assert_eq!(p.len(), q.len(), "Inputs are not the same length");
+
+    let mut total: i64 = 0;
+
+    for (&pi, &qi) in p.iter().zip(q.iter()) {
+        let prod = pi.checked_mul(qi)?;
+        total = total.checked_add(prod)?;
+    }
+
+    Some(total)
+}
+
+/// Return the product of all elements in the iterable (float version).
 ///
 /// If start is None, uses 1.0 as the start value.
 pub fn prod(iter: impl IntoIterator<Item = f64>, start: Option<f64>) -> f64 {
@@ -290,6 +308,18 @@ pub fn prod(iter: impl IntoIterator<Item = f64>, start: Option<f64>) -> f64 {
         result *= x;
     }
     result
+}
+
+/// Return the product of all elements using i64 arithmetic.
+///
+/// Returns None if overflow occurs during multiplication.
+/// Uses checked arithmetic to detect overflow.
+pub fn prod_int(iter: impl IntoIterator<Item = i64>, start: Option<i64>) -> Option<i64> {
+    let mut result = start.unwrap_or(1);
+    for x in iter {
+        result = result.checked_mul(x)?;
+    }
+    Some(result)
 }
 
 #[cfg(test)]
@@ -369,27 +399,18 @@ mod tests {
     }
 
     fn test_dist_impl(p: &[f64], q: &[f64]) {
-        let rs_result = dist(p, q);
-
-        pyo3::Python::attach(|py| {
-            let math = pyo3::types::PyModule::import(py, "math").unwrap();
-            let py_func = math.getattr("dist").unwrap();
+        let rs = dist(p, q);
+        crate::test::with_py_math(|py, math| {
             let py_p = pyo3::types::PyList::new(py, p).unwrap();
             let py_q = pyo3::types::PyList::new(py, q).unwrap();
-            let py_result: f64 = py_func.call1((py_p, py_q)).unwrap().extract().unwrap();
-
-            if py_result.is_nan() && rs_result.is_nan() {
-                return;
-            }
-            assert_eq!(
-                py_result.to_bits(),
-                rs_result.to_bits(),
-                "dist({:?}, {:?}): py={} vs rs={}",
-                p,
-                q,
-                py_result,
-                rs_result
-            );
+            let py: f64 = math
+                .getattr("dist")
+                .unwrap()
+                .call1((py_p, py_q))
+                .unwrap()
+                .extract()
+                .unwrap();
+            crate::test::assert_f64_eq(py, rs, format_args!("dist({p:?}, {q:?})"));
         });
     }
 
@@ -402,27 +423,18 @@ mod tests {
     }
 
     fn test_sumprod_impl(p: &[f64], q: &[f64]) {
-        let rs_result = sumprod(p, q);
-
-        pyo3::Python::attach(|py| {
-            let math = pyo3::types::PyModule::import(py, "math").unwrap();
-            let py_func = math.getattr("sumprod").unwrap();
+        let rs = sumprod(p, q);
+        crate::test::with_py_math(|py, math| {
             let py_p = pyo3::types::PyList::new(py, p).unwrap();
             let py_q = pyo3::types::PyList::new(py, q).unwrap();
-            let py_result: f64 = py_func.call1((py_p, py_q)).unwrap().extract().unwrap();
-
-            if py_result.is_nan() && rs_result.is_nan() {
-                return;
-            }
-            assert_eq!(
-                py_result.to_bits(),
-                rs_result.to_bits(),
-                "sumprod({:?}, {:?}): py={} vs rs={}",
-                p,
-                q,
-                py_result,
-                rs_result
-            );
+            let py: f64 = math
+                .getattr("sumprod")
+                .unwrap()
+                .call1((py_p, py_q))
+                .unwrap()
+                .extract()
+                .unwrap();
+            crate::test::assert_f64_eq(py, rs, format_args!("sumprod({p:?}, {q:?})"));
         });
     }
 
@@ -435,37 +447,22 @@ mod tests {
     }
 
     fn test_prod_impl(values: &[f64], start: Option<f64>) {
-        let rs_result = prod(values.iter().copied(), start);
-
-        pyo3::Python::attach(|py| {
-            let math = pyo3::types::PyModule::import(py, "math").unwrap();
-            let py_func = math.getattr("prod").unwrap();
+        let rs = prod(values.iter().copied(), start);
+        crate::test::with_py_math(|py, math| {
             let py_list = pyo3::types::PyList::new(py, values).unwrap();
-            let py_result: f64 = match start {
+            let py_func = math.getattr("prod").unwrap();
+            let py: f64 = match start {
                 Some(s) => {
                     let kwargs = pyo3::types::PyDict::new(py);
                     kwargs.set_item("start", s).unwrap();
-                    py_func
-                        .call((py_list,), Some(&kwargs))
-                        .unwrap()
-                        .extract()
-                        .unwrap()
+                    py_func.call((py_list,), Some(&kwargs))
                 }
-                None => py_func.call1((py_list,)).unwrap().extract().unwrap(),
-            };
-
-            if py_result.is_nan() && rs_result.is_nan() {
-                return;
+                None => py_func.call1((py_list,)),
             }
-            assert_eq!(
-                py_result.to_bits(),
-                rs_result.to_bits(),
-                "prod({:?}, {:?}): py={} vs rs={}",
-                values,
-                start,
-                py_result,
-                rs_result
-            );
+            .unwrap()
+            .extract()
+            .unwrap();
+            crate::test::assert_f64_eq(py, rs, format_args!("prod({values:?}, {start:?})"));
         });
     }
 

@@ -86,6 +86,33 @@ pub fn isclose(a: f64, b: f64, rel_tol: Option<f64>, abs_tol: Option<f64>) -> Re
     Ok(diff <= abs_tol.max(rel_tol * a.abs().max(b.abs())))
 }
 
+/// Fused multiply-add operation: (x * y) + z.
+///
+/// Returns EDOM for invalid operation (NaN result from non-NaN inputs).
+/// Returns ERANGE for overflow (infinite result from finite inputs).
+#[inline]
+pub fn fma(x: f64, y: f64, z: f64) -> Result<f64> {
+    let r = x.mul_add(y, z);
+
+    // Fast path: if we got a finite result, we're done.
+    if r.is_finite() {
+        return Ok(r);
+    }
+
+    // Non-finite result. Raise an exception if appropriate, else return r.
+    if r.is_nan() {
+        if !x.is_nan() && !y.is_nan() && !z.is_nan() {
+            // NaN result from non-NaN inputs.
+            return Err(Error::EDOM);
+        }
+    } else if x.is_finite() && y.is_finite() && z.is_finite() {
+        // Infinite result from finite inputs.
+        return Err(Error::ERANGE);
+    }
+
+    Ok(r)
+}
+
 /// Return the mantissa and exponent of x as (m, e).
 ///
 /// m is a float and e is an integer such that x == m * 2**e exactly.
@@ -166,10 +193,10 @@ pub fn ulp(x: f64) -> f64 {
     if x.is_infinite() {
         return x;
     }
-    let x2 = nextafter(x, f64::INFINITY, None);
+    let x2 = crate::m::nextafter(x, f64::INFINITY);
     if x2.is_infinite() {
         // Special case: x is the largest positive representable float
-        let x2 = nextafter(x, f64::NEG_INFINITY, None);
+        let x2 = crate::m::nextafter(x, f64::NEG_INFINITY);
         return x - x2;
     }
     x2 - x
@@ -178,6 +205,9 @@ pub fn ulp(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Edge integer values for testing functions like ldexp
+    const EDGE_INTS: [i32; 9] = [0, 1, -1, 100, -100, 1024, -1024, i32::MAX, i32::MIN];
 
     fn test_ldexp(x: f64, i: i32) {
         use pyo3::prelude::*;
@@ -288,7 +318,7 @@ mod tests {
     #[test]
     fn edgetest_ldexp() {
         for &x in &crate::test::EDGE_VALUES {
-            for &i in &crate::test::EDGE_INTS {
+            for &i in &EDGE_INTS {
                 test_ldexp(x, i);
             }
         }
@@ -468,6 +498,93 @@ mod tests {
         fn proptest_isclose(a: f64, b: f64) {
             // Use default tolerances
             test_isclose_impl(a, b, 1e-9, 0.0);
+        }
+    }
+
+    fn test_fma_impl(x: f64, y: f64, z: f64) {
+        use pyo3::prelude::*;
+
+        let rs_result = fma(x, y, z);
+
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_func = math.getattr("fma").unwrap();
+            let py_result = py_func.call1((x, y, z));
+
+            match py_result {
+                Ok(result) => {
+                    let py_val: f64 = result.extract().unwrap();
+                    match rs_result {
+                        Ok(rs_val) => {
+                            if py_val.is_nan() && rs_val.is_nan() {
+                                return;
+                            }
+                            assert_eq!(
+                                py_val.to_bits(),
+                                rs_val.to_bits(),
+                                "fma({x}, {y}, {z}): py={py_val} vs rs={rs_val}"
+                            );
+                        }
+                        Err(e) => {
+                            panic!("fma({x}, {y}, {z}): py={py_val} but rs returned error {e:?}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    if e.is_instance_of::<pyo3::exceptions::PyValueError>(py) {
+                        assert_eq!(
+                            rs_result.as_ref().err(),
+                            Some(&Error::EDOM),
+                            "fma({x}, {y}, {z}): py raised ValueError but rs={:?}",
+                            rs_result
+                        );
+                    } else if e.is_instance_of::<pyo3::exceptions::PyOverflowError>(py) {
+                        assert_eq!(
+                            rs_result.as_ref().err(),
+                            Some(&Error::ERANGE),
+                            "fma({x}, {y}, {z}): py raised OverflowError but rs={:?}",
+                            rs_result
+                        );
+                    } else {
+                        panic!("fma({x}, {y}, {z}): py raised unexpected error {e}");
+                    }
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn test_fma() {
+        // Basic tests
+        test_fma_impl(2.0, 3.0, 4.0); // 2*3+4 = 10
+        test_fma_impl(0.0, 0.0, 0.0);
+        test_fma_impl(1.0, 1.0, 1.0);
+        test_fma_impl(-1.0, 2.0, 3.0);
+        // Edge cases
+        test_fma_impl(f64::INFINITY, 1.0, 0.0);
+        test_fma_impl(0.0, f64::INFINITY, 0.0); // 0 * inf -> NaN -> ValueError
+        test_fma_impl(f64::NAN, 1.0, 0.0);
+        test_fma_impl(1.0, f64::NAN, 0.0);
+        test_fma_impl(1.0, 1.0, f64::NAN);
+        // Overflow cases
+        test_fma_impl(1e308, 10.0, 0.0); // overflow -> OverflowError
+        test_fma_impl(1e308, 1.0, 1e308);
+    }
+
+    #[test]
+    fn edgetest_fma() {
+        for &x in &crate::test::EDGE_VALUES {
+            for &y in &crate::test::EDGE_VALUES {
+                test_fma_impl(x, y, 0.0);
+                test_fma_impl(x, y, 1.0);
+            }
+        }
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn proptest_fma(x: f64, y: f64, z: f64) {
+            test_fma_impl(x, y, z);
         }
     }
 }

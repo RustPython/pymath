@@ -250,7 +250,7 @@ mod tests {
     fn test_expm1(x: f64) {
         crate::test::test_math_1(x, "expm1", expm1);
     }
-    fn test_log_without_base(x: f64) {
+    fn test_log_n(x: f64) {
         crate::test::test_math_1(x, "log", |x| log(x, None));
     }
     fn test_log(x: f64, base: f64) {
@@ -302,8 +302,8 @@ mod tests {
         }
 
         #[test]
-        fn proptest_log_without_base(x: f64) {
-            test_log_without_base(x);
+        fn proptest_log_n(x: f64) {
+            test_log_n(x);
         }
 
         #[test]
@@ -368,9 +368,9 @@ mod tests {
     }
 
     #[test]
-    fn edgetest_log_without_base() {
+    fn edgetest_log_n() {
         for &x in &crate::test::EDGE_VALUES {
-            test_log_without_base(x);
+            test_log_n(x);
         }
     }
 

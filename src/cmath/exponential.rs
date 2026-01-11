@@ -131,9 +131,10 @@ pub fn exp(z: Complex64) -> Result<Complex64> {
     Ok(Complex64::new(r_re, r_im))
 }
 
-/// Complex natural logarithm.
+/// Complex natural logarithm (ln, base e).
+/// TODO: consider to expose API
 #[inline]
-pub fn log(z: Complex64) -> Result<Complex64> {
+pub(crate) fn ln(z: Complex64) -> Result<Complex64> {
     special_value!(z, LOG_SPECIAL_VALUES);
 
     let ax = m::fabs(z.re);
@@ -149,8 +150,10 @@ pub fn log(z: Complex64) -> Result<Complex64> {
                 m::ldexp(ay, f64::MANTISSA_DIGITS as i32),
             )) - f64::MANTISSA_DIGITS as f64 * M_LN2
         } else {
-            // log(+/-0. +/- 0i)
-            return Err(Error::EDOM);
+            // log(+/-0. +/- 0i) - return -inf like CPython does
+            // Note: CPython sets errno=EDOM but still returns a value.
+            // When used with a base, the second c_log call clears errno.
+            f64::NEG_INFINITY
         }
     } else {
         let h = m::hypot(ax, ay);
@@ -167,10 +170,90 @@ pub fn log(z: Complex64) -> Result<Complex64> {
     Ok(Complex64::new(r_re, r_im))
 }
 
+/// Complex logarithm with optional base.
+///
+/// If base is None, returns the natural logarithm.
+/// If base is Some(b), returns log(z) / log(b).
+#[inline]
+pub fn log(z: Complex64, base: Option<Complex64>) -> Result<Complex64> {
+    // c_log always returns a value, but sets errno for special cases.
+    // The error check happens at the end of cmath_log_impl.
+    // For log(z) without base: z=0 raises EDOM
+    // For log(z, base): z=0 doesn't raise because c_log(base) clears errno
+    let z_is_zero = z.re == 0.0 && z.im == 0.0;
+    match base {
+        None => {
+            // No base: raise error if z=0
+            if z_is_zero {
+                return Err(Error::EDOM);
+            }
+            ln(z)
+        }
+        Some(b) => {
+            // With base: z=0 is allowed (second ln clears the "errno")
+            let log_z = ln(z)?;
+            let log_b = ln(b)?;
+            // Use _Py_c_quot-style division to preserve sign of zero
+            Ok(c_quot(log_z, log_b))
+        }
+    }
+}
+
+/// Complex division following _Py_c_quot algorithm.
+/// This preserves the sign of zero correctly and recovers infinities
+/// from NaN results per C11 Annex G.5.2.
+#[inline]
+fn c_quot(a: Complex64, b: Complex64) -> Complex64 {
+    let abs_breal = m::fabs(b.re);
+    let abs_bimag = m::fabs(b.im);
+
+    let mut r = if abs_breal >= abs_bimag {
+        if abs_breal == 0.0 {
+            Complex64::new(f64::NAN, f64::NAN)
+        } else {
+            let ratio = b.im / b.re;
+            let denom = b.re + b.im * ratio;
+            Complex64::new((a.re + a.im * ratio) / denom, (a.im - a.re * ratio) / denom)
+        }
+    } else if abs_bimag >= abs_breal {
+        let ratio = b.re / b.im;
+        let denom = b.re * ratio + b.im;
+        Complex64::new((a.re * ratio + a.im) / denom, (a.im * ratio - a.re) / denom)
+    } else {
+        // At least one of b.re or b.im is NaN
+        Complex64::new(f64::NAN, f64::NAN)
+    };
+
+    // Recover infinities and zeros that computed as nan+nanj.
+    // See C11 Annex G.5.2, routine _Cdivd().
+    if r.re.is_nan() && r.im.is_nan() {
+        if (a.re.is_infinite() || a.im.is_infinite()) && b.re.is_finite() && b.im.is_finite() {
+            let x = m::copysign(if a.re.is_infinite() { 1.0 } else { 0.0 }, a.re);
+            let y = m::copysign(if a.im.is_infinite() { 1.0 } else { 0.0 }, a.im);
+            r.re = f64::INFINITY * (x * b.re + y * b.im);
+            r.im = f64::INFINITY * (y * b.re - x * b.im);
+        } else if (abs_breal.is_infinite() || abs_bimag.is_infinite())
+            && a.re.is_finite()
+            && a.im.is_finite()
+        {
+            let x = m::copysign(if b.re.is_infinite() { 1.0 } else { 0.0 }, b.re);
+            let y = m::copysign(if b.im.is_infinite() { 1.0 } else { 0.0 }, b.im);
+            r.re = 0.0 * (a.re * x + a.im * y);
+            r.im = 0.0 * (a.im * x - a.re * y);
+        }
+    }
+
+    r
+}
+
 /// Complex base-10 logarithm.
 #[inline]
 pub fn log10(z: Complex64) -> Result<Complex64> {
-    let r = log(z)?;
+    // Like log(z) without base, log10(0) raises EDOM
+    if z.re == 0.0 && z.im == 0.0 {
+        return Err(Error::EDOM);
+    }
+    let r = ln(z)?;
     Ok(Complex64::new(r.re / M_LN10, r.im / M_LN10))
 }
 
@@ -191,11 +274,54 @@ mod tests {
     fn test_exp(re: f64, im: f64) {
         test_cmath_func("exp", exp, re, im);
     }
-    fn test_log(re: f64, im: f64) {
-        test_cmath_func("log", log, re, im);
+    fn test_log_n(re: f64, im: f64) {
+        test_cmath_func("log", |z| log(z, None), re, im);
     }
     fn test_log10(re: f64, im: f64) {
         test_cmath_func("log10", log10, re, im);
+    }
+
+    /// Test log with base - compares with Python's cmath.log(z, base)
+    fn test_log(z_re: f64, z_im: f64, base_re: f64, base_im: f64) {
+        use pyo3::prelude::*;
+
+        let z = Complex64::new(z_re, z_im);
+        let base = Complex64::new(base_re, base_im);
+        let rs_result = log(z, Some(base));
+
+        pyo3::Python::attach(|py| {
+            let cmath = pyo3::types::PyModule::import(py, "cmath").unwrap();
+            let py_z = pyo3::types::PyComplex::from_doubles(py, z_re, z_im);
+            let py_base = pyo3::types::PyComplex::from_doubles(py, base_re, base_im);
+            let py_result = cmath.getattr("log").unwrap().call1((py_z, py_base));
+
+            match py_result {
+                Ok(result) => {
+                    use pyo3::types::PyComplexMethods;
+                    let c = result.cast::<pyo3::types::PyComplex>().unwrap();
+                    let py_re = c.real();
+                    let py_im = c.imag();
+                    match rs_result {
+                        Ok(rs) => {
+                            crate::cmath::tests::assert_complex_eq(
+                                py_re, py_im, rs, "log", z_re, z_im,
+                            );
+                        }
+                        Err(e) => {
+                            panic!(
+                                "log({z_re}+{z_im}j, {base_re}+{base_im}j): py=({py_re}, {py_im}) but rs returned error {e:?}"
+                            );
+                        }
+                    }
+                }
+                Err(_) => {
+                    assert!(
+                        rs_result.is_err(),
+                        "log({z_re}+{z_im}j, {base_re}+{base_im}j): py raised error but rs={rs_result:?}"
+                    );
+                }
+            }
+        });
     }
 
     use crate::test::EDGE_VALUES;
@@ -219,10 +345,10 @@ mod tests {
     }
 
     #[test]
-    fn edgetest_log() {
+    fn edgetest_log_n() {
         for &re in &EDGE_VALUES {
             for &im in &EDGE_VALUES {
-                test_log(re, im);
+                test_log_n(re, im);
             }
         }
     }
@@ -232,6 +358,25 @@ mod tests {
         for &re in &EDGE_VALUES {
             for &im in &EDGE_VALUES {
                 test_log10(re, im);
+            }
+        }
+    }
+
+    #[test]
+    fn edgetest_log() {
+        // Test log with various bases - sign preservation edge cases
+        let bases = [0.5, 2.0, 10.0];
+        let values = [0.01, 0.1, 0.5, 1.0, 2.0, 10.0, 100.0];
+        for &base in &bases {
+            for &v in &values {
+                test_log(v, 0.0, base, 0.0);
+            }
+        }
+        // Additional edge cases with imaginary parts
+        for &z_re in &EDGE_VALUES {
+            for &z_im in &EDGE_VALUES {
+                test_log(z_re, z_im, 2.0, 0.0);
+                test_log(z_re, z_im, 0.5, 0.0);
             }
         }
     }
@@ -249,7 +394,7 @@ mod tests {
 
         #[test]
         fn proptest_log(re: f64, im: f64) {
-            test_log(re, im);
+            test_log_n(re, im);
         }
 
         #[test]

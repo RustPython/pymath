@@ -57,13 +57,13 @@ Every function produces identical results to Python at the binary representation
 - [x] `nextafter`
 - [x] `pi`
 - [x] `pow`
-- [x] `prod`
+- [x] `prod` (`prod`, `prod_int`)
 - [x] `radians`
 - [x] `remainder`
 - [x] `sin`
 - [x] `sinh`
 - [x] `sqrt`
-- [x] `sumprod` (`sumprod`, `sumprod_int`, `sumprod_generic`)
+- [x] `sumprod` (`sumprod`, `sumprod_int`)
 - [x] `tan`
 - [x] `tanh`
 - [x] `tau`

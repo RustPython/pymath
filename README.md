@@ -11,34 +11,8 @@ Every function produces identical results to Python at the binary representation
 
 ## Compatibility Status
 
-### math (55/55)
+### math (56/56)
 
-- [x] `ceil`
-- [x] `copysign`
-- [x] `fabs`
-- [x] `floor`
-- [x] `fmod`
-- [x] `frexp`
-- [x] `isclose`
-- [x] `isfinite`
-- [x] `isinf`
-- [x] `isnan`
-- [x] `ldexp`
-- [x] `modf`
-- [x] `nextafter`
-- [x] `remainder`
-- [x] `trunc`
-- [x] `ulp`
-- [x] `cbrt`
-- [x] `exp`
-- [x] `exp2`
-- [x] `expm1`
-- [x] `log`
-- [x] `log10`
-- [x] `log1p`
-- [x] `log2`
-- [x] `pow`
-- [x] `sqrt`
 - [x] `acos`
 - [x] `acosh`
 - [x] `asin`
@@ -46,28 +20,55 @@ Every function produces identical results to Python at the binary representation
 - [x] `atan`
 - [x] `atan2`
 - [x] `atanh`
+- [x] `cbrt`
+- [x] `ceil`
+- [x] `copysign`
 - [x] `cos`
 - [x] `cosh`
-- [x] `sin`
-- [x] `sinh`
-- [x] `tan`
-- [x] `tanh`
+- [x] `degrees`
+- [x] `dist`
+- [x] `e`
 - [x] `erf`
 - [x] `erfc`
-- [x] `gamma`
-- [x] `lgamma`
-- [x] `dist`
+- [x] `exp`
+- [x] `exp2`
+- [x] `expm1`
+- [x] `fabs`
+- [x] `floor`
+- [x] `fma`
+- [x] `fmod`
+- [x] `frexp`
 - [x] `fsum`
-- [x] `hypot`
-- [x] `prod`
-- [x] `sumprod`
-- [x] `degrees`
-- [x] `radians`
-- [x] `pi`
-- [x] `e`
-- [x] `tau`
+- [x] `gamma`
+- [x] `hypot` (n-dimensional)
 - [x] `inf`
+- [x] `isclose`
+- [x] `isfinite`
+- [x] `isinf`
+- [x] `isnan`
+- [x] `ldexp`
+- [x] `lgamma`
+- [x] `log`
+- [x] `log10`
+- [x] `log1p`
+- [x] `log2`
+- [x] `modf`
 - [x] `nan`
+- [x] `nextafter`
+- [x] `pi`
+- [x] `pow`
+- [x] `prod`
+- [x] `radians`
+- [x] `remainder`
+- [x] `sin`
+- [x] `sinh`
+- [x] `sqrt`
+- [x] `sumprod` (`sumprod`, `sumprod_int`, `sumprod_generic`)
+- [x] `tan`
+- [x] `tanh`
+- [x] `tau`
+- [x] `trunc`
+- [x] `ulp`
 
 ### math.integer (6/6, requires `num-bigint` or `malachite-bigint` feature)
 
@@ -78,20 +79,9 @@ Every function produces identical results to Python at the binary representation
 - [x] `lcm`
 - [x] `perm`
 
-### cmath (24/24, requires `complex` feature)
+### cmath (31/31, requires `complex` feature)
 
 - [x] `abs`
-- [x] `isclose`
-- [x] `isfinite`
-- [x] `isinf`
-- [x] `isnan`
-- [x] `phase`
-- [x] `polar`
-- [x] `rect`
-- [x] `exp`
-- [x] `log`
-- [x] `log10`
-- [x] `sqrt`
 - [x] `acos`
 - [x] `acosh`
 - [x] `asin`
@@ -100,10 +90,28 @@ Every function produces identical results to Python at the binary representation
 - [x] `atanh`
 - [x] `cos`
 - [x] `cosh`
+- [x] `e`
+- [x] `exp`
+- [x] `inf`
+- [x] `infj`
+- [x] `isclose`
+- [x] `isfinite`
+- [x] `isinf`
+- [x] `isnan`
+- [x] `log`
+- [x] `log10`
+- [x] `nan`
+- [x] `nanj`
+- [x] `phase`
+- [x] `pi`
+- [x] `polar`
+- [x] `rect`
 - [x] `sin`
 - [x] `sinh`
+- [x] `sqrt`
 - [x] `tan`
 - [x] `tanh`
+- [x] `tau`
 
 ## Usage
 

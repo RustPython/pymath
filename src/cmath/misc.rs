@@ -22,8 +22,8 @@ pub fn phase(z: Complex64) -> Result<f64> {
     let phi = m::atan2(z.im, z.re);
     match crate::err::get_errno() {
         0 => Ok(phi),
-        libc::EDOM => Err(Error::EDOM),
-        libc::ERANGE => Err(Error::ERANGE),
+        e if e == Error::EDOM as i32 => Err(Error::EDOM),
+        e if e == Error::ERANGE as i32 => Err(Error::ERANGE),
         _ => Err(Error::EDOM), // Unknown errno treated as domain error (like PyErr_SetFromErrno)
     }
 }

@@ -32,11 +32,7 @@ jobs:
       with:
         python-version: "3.14"
     - name: Setup Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: ${{ matrix.rust }}
-        override: true
+      uses: dtolnay/rust-toolchain@stable
     - name: Build
       run: cargo build --verbose
     - name: Run tests with num-bigint
@@ -45,3 +41,84 @@ jobs:
       run: cargo test --verbose --features ${{ matrix.features }},num-bigint --release
     - name: Run tests with malachite-bigint
       run: cargo test --verbose --features ${{ matrix.features }},malachite-bigint
+
+    # macOS-specific cross-compilation checks
+    - name: Setup Intel macOS target
+      if: runner.os == 'macOS'
+      run: rustup target add x86_64-apple-darwin
+    - name: Check Intel macOS
+      if: runner.os == 'macOS'
+      run: cargo check --target x86_64-apple-darwin --features ${{ matrix.features }},malachite-bigint
+
+    - name: Setup iOS target
+      if: runner.os == 'macOS'
+      run: rustup target add aarch64-apple-ios
+    - name: Check iOS
+      if: runner.os == 'macOS'
+      run: cargo check --target aarch64-apple-ios --features ${{ matrix.features }},malachite-bigint
+
+  exotic_targets:
+    name: Check exotic targets
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+
+    # 32-bit Linux
+    - name: Setup i686-unknown-linux-gnu
+      run: rustup target add i686-unknown-linux-gnu
+    - name: Install gcc-multilib
+      run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+    - name: Check i686-unknown-linux-gnu
+      run: cargo check --target i686-unknown-linux-gnu --features complex,malachite-bigint
+
+    # Android
+    - name: Setup aarch64-linux-android
+      run: rustup target add aarch64-linux-android
+    - name: Check aarch64-linux-android
+      run: cargo check --target aarch64-linux-android --features complex,malachite-bigint
+
+    # ARM64 Linux
+    - name: Setup aarch64-unknown-linux-gnu
+      run: rustup target add aarch64-unknown-linux-gnu
+    - name: Install gcc-aarch64-linux-gnu
+      run: sudo apt-get install -y gcc-aarch64-linux-gnu
+    - name: Check aarch64-unknown-linux-gnu
+      run: cargo check --target aarch64-unknown-linux-gnu --features complex,malachite-bigint
+
+    # musl
+    - name: Setup i686-unknown-linux-musl
+      run: rustup target add i686-unknown-linux-musl
+    - name: Install musl-tools
+      run: sudo apt-get install -y musl-tools
+    - name: Check i686-unknown-linux-musl
+      run: cargo check --target i686-unknown-linux-musl --features complex,malachite-bigint
+
+    # FreeBSD
+    - name: Setup x86_64-unknown-freebsd
+      run: rustup target add x86_64-unknown-freebsd
+    - name: Check x86_64-unknown-freebsd
+      run: cargo check --target x86_64-unknown-freebsd --features complex,malachite-bigint
+
+    # WASM
+    - name: Setup wasm32-unknown-unknown
+      run: rustup target add wasm32-unknown-unknown
+    - name: Check wasm32-unknown-unknown
+      run: cargo check --target wasm32-unknown-unknown --features complex,malachite-bigint
+
+    # WASI
+    - name: Setup wasm32-wasip1
+      run: rustup target add wasm32-wasip1
+    - name: Check wasm32-wasip1
+      run: cargo check --target wasm32-wasip1 --features complex,malachite-bigint
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+    - name: Run clippy
+      run: cargo clippy --features complex,malachite-bigint -- -Dwarnings

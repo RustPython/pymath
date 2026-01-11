@@ -156,3 +156,7 @@ assert_eq!(
 - `pymath::math` - Real number math functions (Python's `math` module)
 - `pymath::cmath` - Complex number functions (Python's `cmath` module)
 - `pymath::m` - Direct libm bindings
+
+## Important Note
+
+This library guarantees **compatibility with Python's math module**, not mathematical correctness.

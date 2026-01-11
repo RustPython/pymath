@@ -2,6 +2,8 @@
 
 // Submodules
 mod aggregate;
+#[cfg(feature = "_bigint")]
+mod bigint;
 mod exponential;
 mod gamma;
 #[cfg(feature = "_bigint")]
@@ -11,6 +13,8 @@ mod trigonometric;
 
 // Re-export from submodules
 pub use aggregate::{dist, fsum, prod, prod_int, sumprod, sumprod_int};
+#[cfg(feature = "_bigint")]
+pub use bigint::{comb_bigint, ldexp_bigint, log_bigint, log2_bigint, log10_bigint, perm_bigint};
 pub use exponential::{cbrt, exp, exp2, expm1, log, log1p, log2, log10, pow, sqrt};
 pub use gamma::{erf, erfc, gamma, lgamma};
 pub use misc::{

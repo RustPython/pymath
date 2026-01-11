@@ -13,6 +13,8 @@ mod trigonometric;
 pub use aggregate::{dist, fsum, prod, prod_int, sumprod, sumprod_int};
 pub use exponential::{cbrt, exp, exp2, expm1, log, log1p, log2, log10, pow, sqrt};
 pub use gamma::{erf, erfc, gamma, lgamma};
+#[cfg(feature = "_bigint")]
+pub use integer::{log_bigint, log2_bigint, log10_bigint};
 pub use misc::{
     ceil, copysign, fabs, floor, fma, fmod, frexp, isclose, isfinite, isinf, isnan, ldexp, modf,
     nextafter, remainder, trunc, ulp,

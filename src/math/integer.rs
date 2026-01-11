@@ -738,6 +738,124 @@ pub fn perm(n: i64, k: Option<i64>) -> Result<BigUint, ()> {
     Ok(perm_comb_small(n, k, false))
 }
 
+// Logarithm functions for BigInt
+
+/// Compute frexp-like decomposition for BigInt.
+/// Returns (mantissa, exponent) where:
+/// - mantissa is in [0.5, 1.0) for positive n
+/// - n ~= mantissa * 2^exponent
+///
+/// See: _PyLong_Frexp.
+fn frexp_bigint(n: &BigInt) -> (f64, i64) {
+    let bits = n.bits();
+    if bits == 0 {
+        return (0.0, 0);
+    }
+
+    let bits = bits as i64;
+
+    // For small integers that fit in f64 mantissa (53 bits)
+    if bits <= 53 {
+        let x = n.to_f64().unwrap();
+        // frexp returns (m, e) where x = m * 2^e and 0.5 <= |m| < 1
+        let mut e: i32 = 0;
+        let m = crate::m::frexp(x, &mut e);
+        return (m, e as i64);
+    }
+
+    // For large integers, extract top ~53 bits
+    // Shift right to keep DBL_MANT_DIG + 2 = 55 bits for rounding
+    let shift = bits - 55;
+    let mantissa_int = n >> shift as u64;
+    let mut x = mantissa_int.to_f64().unwrap();
+
+    // x is now approximately n / 2^shift, with ~55 bits of precision
+    // Scale to [0.5, 1.0) range
+    // x is in [2^54, 2^55), so divide by 2^55 to get [0.5, 1.0)
+    x /= (1u64 << 55) as f64;
+
+    // Adjust if rounding pushed us to 1.0
+    if x == 1.0 {
+        x = 0.5;
+        return (x, bits + 1);
+    }
+
+    (x, bits)
+}
+
+/// Return the natural logarithm of a BigInt.
+///
+/// Returns Err(EDOM) if n is not positive.
+pub fn log_bigint(n: &BigInt, base: Option<f64>) -> crate::Result<f64> {
+    if !n.is_positive() {
+        return Err(crate::Error::EDOM);
+    }
+
+    // Try direct conversion first
+    if let Some(x) = n.to_f64() {
+        if x.is_finite() {
+            return super::log(x, base);
+        }
+    }
+
+    // Use frexp decomposition for large values
+    // n ~= x * 2^e, so log(n) = log(x) + log(2) * e
+    let (x, e) = frexp_bigint(n);
+    let log_n = x.ln() + std::f64::consts::LN_2 * (e as f64);
+
+    match base {
+        None => Ok(log_n),
+        Some(b) => {
+            if b <= 0.0 || b == 1.0 {
+                return Err(crate::Error::EDOM);
+            }
+            Ok(log_n / b.ln())
+        }
+    }
+}
+
+/// Return the base-2 logarithm of a BigInt.
+///
+/// Returns Err(EDOM) if n is not positive.
+pub fn log2_bigint(n: &BigInt) -> crate::Result<f64> {
+    if !n.is_positive() {
+        return Err(crate::Error::EDOM);
+    }
+
+    // Try direct conversion first
+    if let Some(x) = n.to_f64() {
+        if x.is_finite() {
+            return super::log2(x);
+        }
+    }
+
+    // Use frexp decomposition for large values
+    // n ~= x * 2^e, so log2(n) = log2(x) + e
+    let (x, e) = frexp_bigint(n);
+    Ok(x.log2() + (e as f64))
+}
+
+/// Return the base-10 logarithm of a BigInt.
+///
+/// Returns Err(EDOM) if n is not positive.
+pub fn log10_bigint(n: &BigInt) -> crate::Result<f64> {
+    if !n.is_positive() {
+        return Err(crate::Error::EDOM);
+    }
+
+    // Try direct conversion first
+    if let Some(x) = n.to_f64() {
+        if x.is_finite() {
+            return super::log10(x);
+        }
+    }
+
+    // Use frexp decomposition for large values
+    // n ~= x * 2^e, so log10(n) = log10(x) + log10(2) * e
+    let (x, e) = frexp_bigint(n);
+    Ok(x.log10() + std::f64::consts::LOG10_2 * (e as f64))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1156,6 +1274,202 @@ mod tests {
         #[test]
         fn proptest_perm_none(n in -10i64..25i64) {
             test_perm_impl(n, None);
+        }
+    }
+
+    // Log BigInt tests
+
+    fn test_log_bigint_impl(n: &BigInt, base: Option<f64>) {
+        let rs = log_bigint(n, base);
+        crate::test::with_py_math(|py, math| {
+            // Convert BigInt to Python int via string using builtins.int()
+            let n_str = n.to_string();
+            let builtins = pyo3::types::PyModule::import(py, "builtins").unwrap();
+            let py_n = builtins
+                .getattr("int")
+                .unwrap()
+                .call1((n_str.as_str(),))
+                .unwrap();
+            let py_result = match base {
+                Some(b) => math.getattr("log").unwrap().call1((py_n, b)),
+                None => math.getattr("log").unwrap().call1((py_n,)),
+            };
+            match py_result {
+                Ok(py_val) => {
+                    let py_f: f64 = py_val.extract().unwrap();
+                    let rs_f = rs.unwrap();
+                    if py_f.is_nan() && rs_f.is_nan() {
+                        return;
+                    }
+                    // Handle exact equality (e.g., log(1) = 0)
+                    if py_f == rs_f {
+                        return;
+                    }
+                    // Allow small relative error for large numbers
+                    let rel_err = ((py_f - rs_f) / py_f).abs();
+                    assert!(
+                        rel_err < 1e-10,
+                        "log_bigint({n}, {base:?}): py={py_f} vs rs={rs_f}, rel_err={rel_err}"
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs.is_err(),
+                        "log_bigint({n}, {base:?}): py raised error but rs={rs:?}"
+                    );
+                }
+            }
+        });
+    }
+
+    fn test_log2_bigint_impl(n: &BigInt) {
+        let rs = log2_bigint(n);
+        crate::test::with_py_math(|py, math| {
+            let n_str = n.to_string();
+            let builtins = pyo3::types::PyModule::import(py, "builtins").unwrap();
+            let py_n = builtins
+                .getattr("int")
+                .unwrap()
+                .call1((n_str.as_str(),))
+                .unwrap();
+            let py_result = math.getattr("log2").unwrap().call1((py_n,));
+            match py_result {
+                Ok(py_val) => {
+                    let py_f: f64 = py_val.extract().unwrap();
+                    let rs_f = rs.unwrap();
+                    if py_f.is_nan() && rs_f.is_nan() {
+                        return;
+                    }
+                    if py_f == rs_f {
+                        return;
+                    }
+                    let rel_err = ((py_f - rs_f) / py_f).abs();
+                    assert!(
+                        rel_err < 1e-10,
+                        "log2_bigint({n}): py={py_f} vs rs={rs_f}, rel_err={rel_err}"
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs.is_err(),
+                        "log2_bigint({n}): py raised error but rs={rs:?}"
+                    );
+                }
+            }
+        });
+    }
+
+    fn test_log10_bigint_impl(n: &BigInt) {
+        let rs = log10_bigint(n);
+        crate::test::with_py_math(|py, math| {
+            let n_str = n.to_string();
+            let builtins = pyo3::types::PyModule::import(py, "builtins").unwrap();
+            let py_n = builtins
+                .getattr("int")
+                .unwrap()
+                .call1((n_str.as_str(),))
+                .unwrap();
+            let py_result = math.getattr("log10").unwrap().call1((py_n,));
+            match py_result {
+                Ok(py_val) => {
+                    let py_f: f64 = py_val.extract().unwrap();
+                    let rs_f = rs.unwrap();
+                    if py_f.is_nan() && rs_f.is_nan() {
+                        return;
+                    }
+                    if py_f == rs_f {
+                        return;
+                    }
+                    let rel_err = ((py_f - rs_f) / py_f).abs();
+                    assert!(
+                        rel_err < 1e-10,
+                        "log10_bigint({n}): py={py_f} vs rs={rs_f}, rel_err={rel_err}"
+                    );
+                }
+                Err(_) => {
+                    assert!(
+                        rs.is_err(),
+                        "log10_bigint({n}): py raised error but rs={rs:?}"
+                    );
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn edgetest_log_bigint() {
+        // Small values
+        for i in -10i64..=100 {
+            let n = BigInt::from(i);
+            test_log_bigint_impl(&n, None);
+            test_log_bigint_impl(&n, Some(2.0));
+            test_log_bigint_impl(&n, Some(10.0));
+        }
+        // Powers of 2 (important for log2)
+        for exp in 0..100u32 {
+            let n = BigInt::from(1u64) << exp;
+            test_log_bigint_impl(&n, None);
+            test_log_bigint_impl(&n, Some(2.0));
+        }
+        // Large values
+        let ten = BigInt::from(10);
+        for exp in [100, 200, 500, 1000] {
+            let n = ten.pow(exp);
+            test_log_bigint_impl(&n, None);
+            test_log_bigint_impl(&n, Some(2.0));
+            test_log_bigint_impl(&n, Some(10.0));
+        }
+    }
+
+    #[test]
+    fn edgetest_log2_bigint() {
+        for i in -10i64..=100 {
+            test_log2_bigint_impl(&BigInt::from(i));
+        }
+        for exp in 0..100u32 {
+            test_log2_bigint_impl(&(BigInt::from(1u64) << exp));
+        }
+        let ten = BigInt::from(10);
+        for exp in [100, 200, 500, 1000] {
+            test_log2_bigint_impl(&ten.pow(exp));
+        }
+    }
+
+    #[test]
+    fn edgetest_log10_bigint() {
+        for i in -10i64..=100 {
+            test_log10_bigint_impl(&BigInt::from(i));
+        }
+        let ten = BigInt::from(10);
+        for exp in [10, 50, 100, 200, 500, 1000] {
+            test_log10_bigint_impl(&ten.pow(exp));
+        }
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn proptest_log_bigint(n in 1i64..1_000_000i64) {
+            test_log_bigint_impl(&BigInt::from(n), None);
+        }
+
+        #[test]
+        fn proptest_log_bigint_base2(n in 1i64..1_000_000i64) {
+            test_log_bigint_impl(&BigInt::from(n), Some(2.0));
+        }
+
+        #[test]
+        fn proptest_log_bigint_base10(n in 1i64..1_000_000i64) {
+            test_log_bigint_impl(&BigInt::from(n), Some(10.0));
+        }
+
+        #[test]
+        fn proptest_log2_bigint(n in 1i64..1_000_000i64) {
+            test_log2_bigint_impl(&BigInt::from(n));
+        }
+
+        #[test]
+        fn proptest_log10_bigint(n in 1i64..1_000_000i64) {
+            test_log10_bigint_impl(&BigInt::from(n));
         }
     }
 }

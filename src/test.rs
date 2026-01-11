@@ -46,9 +46,6 @@ pub(crate) const EDGE_VALUES: [f64; 30] = [
     std::f64::consts::TAU,       // sin(2*PI) ≈ 0, cos(2*PI) = 1
 ];
 
-/// Edge integer values for testing functions like ldexp
-pub(crate) const EDGE_INTS: [i32; 9] = [0, 1, -1, 100, -100, 1024, -1024, i32::MAX, i32::MIN];
-
 pub(crate) fn unwrap<'py>(
     py: Python<'py>,
     py_v: PyResult<Bound<'py, PyAny>>,
@@ -92,6 +89,32 @@ pub(crate) fn test_math_1(x: f64, func_name: &str, rs_func: impl Fn(f64) -> crat
             "{func_name}({x}): py={py_result} vs rs={rs_result}"
         );
     });
+}
+
+/// Run a test with Python math module
+pub(crate) fn with_py_math<F, R>(f: F) -> R
+where
+    F: FnOnce(Python, &pyo3::Bound<pyo3::types::PyModule>) -> R,
+{
+    pyo3::Python::attach(|py| {
+        let math = pyo3::types::PyModule::import(py, "math").unwrap();
+        f(py, &math)
+    })
+}
+
+/// Assert two f64 values are equal (handles NaN)
+pub(crate) fn assert_f64_eq(py: f64, rs: f64, context: impl std::fmt::Display) {
+    if py.is_nan() && rs.is_nan() {
+        return;
+    }
+    assert_eq!(
+        py.to_bits(),
+        rs.to_bits(),
+        "{}: py={} vs rs={}",
+        context,
+        py,
+        rs
+    );
 }
 
 /// Test a 2-argument function that returns Result<f64>

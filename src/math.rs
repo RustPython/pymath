@@ -10,11 +10,11 @@ mod misc;
 mod trigonometric;
 
 // Re-export from submodules
-pub use aggregate::{dist, fsum, prod, sumprod};
+pub use aggregate::{dist, fsum, prod, prod_int, sumprod, sumprod_int};
 pub use exponential::{cbrt, exp, exp2, expm1, log, log1p, log2, log10, pow, sqrt};
 pub use gamma::{erf, erfc, gamma, lgamma};
 pub use misc::{
-    ceil, copysign, fabs, floor, fmod, frexp, isclose, isfinite, isinf, isnan, ldexp, modf,
+    ceil, copysign, fabs, floor, fma, fmod, frexp, isclose, isfinite, isinf, isnan, ldexp, modf,
     nextafter, remainder, trunc, ulp,
 };
 pub use trigonometric::{

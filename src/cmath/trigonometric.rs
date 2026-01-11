@@ -83,8 +83,8 @@ static SINH_SPECIAL_VALUES: [[Complex64; 7]; 7] = [
 static TANH_SPECIAL_VALUES: [[Complex64; 7]; 7] = [
     [c(-1.0, 0.0), c(U, U), c(-1.0, -0.0), c(-1.0, 0.0), c(U, U), c(-1.0, 0.0), c(-1.0, 0.0)],
     [c(N, N),      c(U, U), c(U, U),       c(U, U),      c(U, U), c(N, N),      c(N, N)],
-    [c(-0.0, N),   c(U, U), c(-0.0, -0.0), c(-0.0, 0.0), c(U, U), c(-0.0, N),   c(-0.0, N)],
-    [c(0.0, N),    c(U, U), c(0.0, -0.0),  c(0.0, 0.0),  c(U, U), c(0.0, N),    c(0.0, N)],
+    [c(N, N),      c(U, U), c(-0.0, -0.0), c(-0.0, 0.0), c(U, U), c(N, N),      c(N, N)],
+    [c(N, N),      c(U, U), c(0.0, -0.0),  c(0.0, 0.0),  c(U, U), c(N, N),      c(N, N)],
     [c(N, N),      c(U, U), c(U, U),       c(U, U),      c(U, U), c(N, N),      c(N, N)],
     [c(1.0, 0.0),  c(U, U), c(1.0, -0.0),  c(1.0, 0.0),  c(U, U), c(1.0, 0.0),  c(1.0, 0.0)],
     [c(N, N),      c(N, N), c(N, -0.0),    c(N, 0.0),    c(N, N), c(N, N),      c(N, N)],

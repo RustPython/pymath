@@ -11,11 +11,34 @@ pub use exponential::{exp, log, log10, sqrt};
 pub use misc::{abs, isclose, isfinite, isinf, isnan, phase, polar, rect};
 pub use trigonometric::{acos, acosh, asin, asinh, atan, atanh, cos, cosh, sin, sinh, tan, tanh};
 
+use num_complex::Complex64;
+
+// Public constants (matching Python's cmath module)
+
+/// The mathematical constant e = 2.718281...
+pub const E: f64 = std::f64::consts::E;
+
+/// The mathematical constant π = 3.141592...
+pub const PI: f64 = std::f64::consts::PI;
+
+/// The mathematical constant τ = 6.283185...
+pub const TAU: f64 = std::f64::consts::TAU;
+
+/// Positive infinity.
+pub const INF: f64 = f64::INFINITY;
+
+/// A floating point "not a number" (NaN) value.
+pub const NAN: f64 = f64::NAN;
+
+/// Complex number with zero real part and positive infinity imaginary part.
+pub const INFJ: Complex64 = Complex64::new(0.0, f64::INFINITY);
+
+/// Complex number with zero real part and NaN imaginary part.
+pub const NANJ: Complex64 = Complex64::new(0.0, f64::NAN);
+
 #[cfg(test)]
 use crate::Result;
 use crate::m;
-#[cfg(test)]
-use num_complex::Complex64;
 
 // Shared constants
 
@@ -24,8 +47,6 @@ const M_LN2: f64 = core::f64::consts::LN_2;
 /// Used to avoid spurious overflow in sqrt, log, inverse trig/hyperbolic functions.
 const CM_LARGE_DOUBLE: f64 = f64::MAX / 4.0;
 const CM_LOG_LARGE_DOUBLE: f64 = 709.0895657128241; // log(CM_LARGE_DOUBLE)
-
-const INF: f64 = f64::INFINITY;
 
 // Special value table constants
 const P: f64 = core::f64::consts::PI;

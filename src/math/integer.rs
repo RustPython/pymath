@@ -3,11 +3,7 @@
 //! Integer-related mathematical functions.
 //! This module requires either `num-bigint` or `malachite-bigint` feature.
 
-#[cfg(feature = "malachite-bigint")]
-use malachite_bigint::{BigInt, BigUint};
-#[cfg(feature = "num-bigint")]
-use num_bigint::{BigInt, BigUint};
-
+use super::bigint::{BigInt, BigUint};
 use num_integer::Integer;
 use num_traits::{One, Signed, ToPrimitive, Zero};
 
@@ -16,13 +12,13 @@ use num_traits::{One, Signed, ToPrimitive, Zero};
 /// gcd() with no arguments returns 0.
 /// gcd(a) returns abs(a).
 #[inline]
-pub fn gcd(args: &[BigInt]) -> BigInt {
+pub fn gcd(args: &[&BigInt]) -> BigInt {
     if args.is_empty() {
         return BigInt::zero();
     }
     let mut result = args[0].abs();
     for arg in &args[1..] {
-        result = result.gcd(arg);
+        result = result.gcd(*arg);
         if result.is_one() {
             return result;
         }
@@ -35,7 +31,7 @@ pub fn gcd(args: &[BigInt]) -> BigInt {
 /// lcm() with no arguments returns 1.
 /// lcm(a) returns abs(a).
 #[inline]
-pub fn lcm(args: &[BigInt]) -> BigInt {
+pub fn lcm(args: &[&BigInt]) -> BigInt {
     if args.is_empty() {
         return BigInt::one();
     }
@@ -44,7 +40,7 @@ pub fn lcm(args: &[BigInt]) -> BigInt {
         if result.is_zero() || arg.is_zero() {
             return BigInt::zero();
         }
-        let g = result.gcd(arg);
+        let g = result.gcd(*arg);
         result = result / &g * arg.abs();
     }
     result
@@ -587,7 +583,7 @@ const FAST_PERM_LIMITS: [u64; 21] = [
 ];
 
 /// Calculate C(n, k) or P(n, k) for n in the 63-bit range.
-fn perm_comb_small(n: u64, k: u64, is_comb: bool) -> BigUint {
+pub(super) fn perm_comb_small(n: u64, k: u64, is_comb: bool) -> BigUint {
     if k == 0 {
         return BigUint::one();
     }
@@ -646,31 +642,6 @@ fn perm_comb_small(n: u64, k: u64, is_comb: bool) -> BigUint {
     let j = k / 2;
     let a = perm_comb_small(n, j, is_comb);
     let b = perm_comb_small(n - j, k - j, is_comb);
-    let mut result = a * b;
-    if is_comb {
-        let c = perm_comb_small(k, j, true);
-        result /= c;
-    }
-    result
-}
-
-/// Calculate P(n, k) or C(n, k) using recursive formulas for big n.
-/// Reserved for future BigUint n support.
-#[allow(dead_code)]
-fn perm_comb(n: &BigUint, k: u64, is_comb: bool) -> BigUint {
-    if k == 0 {
-        return BigUint::one();
-    }
-    if k == 1 {
-        return n.clone();
-    }
-
-    // P(n, k) = P(n, j) * P(n-j, k-j)
-    // C(n, k) = C(n, j) * C(n-j, k-j) / C(k, j)
-    let j = k / 2;
-    let a = perm_comb(n, j, is_comb);
-    let n_minus_j = n - BigUint::from(j);
-    let b = perm_comb(&n_minus_j, k - j, is_comb);
     let mut result = a * b;
     if is_comb {
         let c = perm_comb_small(k, j, true);
@@ -781,7 +752,8 @@ mod tests {
     fn test_gcd_impl(args: &[i64]) {
         use std::str::FromStr;
         let bigints: Vec<BigInt> = args.iter().map(|&x| BigInt::from(x)).collect();
-        let rs = gcd(&bigints);
+        let refs: Vec<_> = bigints.iter().collect();
+        let rs = gcd(&refs);
         crate::test::with_py_math(|py, math| {
             let py_args = pyo3::types::PyTuple::new(py, args).unwrap();
             let py_result = math.getattr("gcd").unwrap().call1(py_args).unwrap();
@@ -794,7 +766,8 @@ mod tests {
     fn test_lcm_impl(args: &[i64]) {
         use std::str::FromStr;
         let bigints: Vec<BigInt> = args.iter().map(|&x| BigInt::from(x)).collect();
-        let rs = lcm(&bigints);
+        let refs: Vec<_> = bigints.iter().collect();
+        let rs = lcm(&refs);
         crate::test::with_py_math(|py, math| {
             let py_args = pyo3::types::PyTuple::new(py, args).unwrap();
             let py_result = math.getattr("lcm").unwrap().call1(py_args).unwrap();

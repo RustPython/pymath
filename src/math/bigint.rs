@@ -110,10 +110,10 @@ pub fn log_bigint(n: &BigInt, base: Option<f64>) -> crate::Result<f64> {
     }
 
     // Try direct conversion first
-    if let Some(x) = n.to_f64() {
-        if x.is_finite() {
-            return super::log(x, base);
-        }
+    if let Some(x) = n.to_f64()
+        && x.is_finite()
+    {
+        return super::log(x, base);
     }
 
     // Use frexp decomposition for large values
@@ -141,10 +141,10 @@ pub fn log2_bigint(n: &BigInt) -> crate::Result<f64> {
     }
 
     // Try direct conversion first
-    if let Some(x) = n.to_f64() {
-        if x.is_finite() {
-            return super::log2(x);
-        }
+    if let Some(x) = n.to_f64()
+        && x.is_finite()
+    {
+        return super::log2(x);
     }
 
     // Use frexp decomposition for large values
@@ -162,10 +162,10 @@ pub fn log10_bigint(n: &BigInt) -> crate::Result<f64> {
     }
 
     // Try direct conversion first
-    if let Some(x) = n.to_f64() {
-        if x.is_finite() {
-            return super::log10(x);
-        }
+    if let Some(x) = n.to_f64()
+        && x.is_finite()
+    {
+        return super::log10(x);
     }
 
     // Use frexp decomposition for large values

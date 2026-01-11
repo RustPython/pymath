@@ -1,6 +1,10 @@
 use std::ffi::c_int;
 
-// The values are defined in libc
+#[cfg(target_os = "windows")]
+unsafe extern "C" {
+    safe fn _errno() -> *mut i32;
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     EDOM = 33,
@@ -14,8 +18,8 @@ impl TryFrom<c_int> for Error {
 
     fn try_from(value: c_int) -> std::result::Result<Self, Self::Error> {
         match value {
-            33 => Ok(Error::EDOM),
-            34 => Ok(Error::ERANGE),
+            x if x == Error::EDOM as c_int => Ok(Error::EDOM),
+            x if x == Error::ERANGE as c_int => Ok(Error::ERANGE),
             _ => Err(value),
         }
     }
@@ -24,54 +28,60 @@ impl TryFrom<c_int> for Error {
 /// Set errno to the given value.
 #[inline]
 pub(crate) fn set_errno(value: i32) {
+    #[cfg(target_os = "linux")]
     unsafe {
-        #[cfg(target_os = "linux")]
-        {
-            *libc::__errno_location() = value;
-        }
-        #[cfg(target_os = "macos")]
-        {
-            *libc::__error() = value;
-        }
-        #[cfg(target_os = "windows")]
-        {
-            unsafe extern "C" {
-                safe fn _errno() -> *mut i32;
-            }
-            *_errno() = value;
-        }
-        #[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
-        {
-            // FreeBSD, NetBSD, OpenBSD, etc. use __error()
-            *libc::__error() = value;
-        }
+        *libc::__errno_location() = value;
     }
+    #[cfg(target_os = "android")]
+    unsafe {
+        *libc::__errno() = value;
+    }
+    #[cfg(target_os = "macos")]
+    unsafe {
+        *libc::__error() = value;
+    }
+    #[cfg(target_os = "windows")]
+    unsafe {
+        *_errno() = value;
+    }
+    #[cfg(all(unix, not(any(target_os = "linux", target_os = "android", target_os = "macos"))))]
+    unsafe {
+        // FreeBSD, NetBSD, OpenBSD, etc. use __error()
+        *libc::__error() = value;
+    }
+    // WASM and other targets: no-op (no errno)
+    #[cfg(not(any(unix, windows)))]
+    let _ = value;
 }
 
 /// Get the current errno value.
 #[inline]
 pub(crate) fn get_errno() -> i32 {
+    #[cfg(target_os = "linux")]
     unsafe {
-        #[cfg(target_os = "linux")]
-        {
-            *libc::__errno_location()
-        }
-        #[cfg(target_os = "macos")]
-        {
-            *libc::__error()
-        }
-        #[cfg(target_os = "windows")]
-        {
-            unsafe extern "C" {
-                safe fn _errno() -> *mut i32;
-            }
-            *_errno()
-        }
-        #[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
-        {
-            // FreeBSD, NetBSD, OpenBSD, etc. use __error()
-            *libc::__error()
-        }
+        *libc::__errno_location()
+    }
+    #[cfg(target_os = "android")]
+    unsafe {
+        *libc::__errno()
+    }
+    #[cfg(target_os = "macos")]
+    unsafe {
+        *libc::__error()
+    }
+    #[cfg(target_os = "windows")]
+    unsafe {
+        *_errno()
+    }
+    #[cfg(all(unix, not(any(target_os = "linux", target_os = "android", target_os = "macos"))))]
+    unsafe {
+        // FreeBSD, NetBSD, OpenBSD, etc. use __error()
+        *libc::__error()
+    }
+    // WASM and other targets: no errno
+    #[cfg(not(any(unix, windows)))]
+    {
+        0
     }
 }
 
@@ -80,8 +90,8 @@ pub(crate) fn get_errno() -> i32 {
 pub(crate) fn is_error(x: f64) -> Result<f64> {
     match get_errno() {
         0 => Ok(x),
-        libc::EDOM => Err(Error::EDOM),
-        libc::ERANGE => {
+        e if e == Error::EDOM as i32 => Err(Error::EDOM),
+        e if e == Error::ERANGE as i32 => {
             // Underflow to zero is not an error.
             // Use 1.5 threshold to handle subnormal results that don't underflow to zero
             // (e.g., on Ubuntu/ia64) and to correctly detect underflows in expm1()

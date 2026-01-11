@@ -80,12 +80,12 @@ fn approximate_isqrt(n: u64) -> u32 {
 
 /// Return the integer part of the square root of a non-negative integer.
 ///
-/// Returns Err if n is negative.
-pub fn isqrt(n: &BigInt) -> Result<BigInt, ()> {
+/// Returns Err(EDOM) if n is negative.
+pub fn isqrt(n: &BigInt) -> crate::Result<BigInt> {
     if n.is_negative() {
-        return Err(());
+        return Err(crate::Error::EDOM);
     }
-    Ok(isqrt_unsigned(&n.magnitude()).into())
+    Ok(isqrt_unsigned(n.magnitude()).into())
 }
 
 /// Return the integer part of the square root of the input.
@@ -233,12 +233,12 @@ fn factorial_odd_part(n: u64) -> BigUint {
 
 /// Return n factorial (n!).
 ///
-/// Returns Err(()) if n is negative.
+/// Returns Err(EDOM) if n is negative.
 /// Uses the divide-and-conquer algorithm.
 /// Based on: http://www.luschny.de/math/factorial/binarysplitfact.html
-pub fn factorial(n: i64) -> Result<BigUint, ()> {
+pub fn factorial(n: i64) -> crate::Result<BigUint> {
     if n < 0 {
-        return Err(());
+        return Err(crate::Error::EDOM);
     }
     let n = n as u64;
     // Use lookup table for small values
@@ -652,12 +652,12 @@ pub(super) fn perm_comb_small(n: u64, k: u64, is_comb: bool) -> BigUint {
 
 /// Return the number of ways to choose k items from n items (n choose k).
 ///
-/// Returns Err(()) if n or k is negative.
+/// Returns Err(EDOM) if n or k is negative.
 /// Evaluates to n! / (k! * (n - k)!) when k <= n and evaluates
 /// to zero when k > n.
-pub fn comb(n: i64, k: i64) -> Result<BigUint, ()> {
+pub fn comb(n: i64, k: i64) -> crate::Result<BigUint> {
     if n < 0 || k < 0 {
-        return Err(());
+        return Err(crate::Error::EDOM);
     }
     let (n, k) = (n as u64, k as u64);
     if k > n {
@@ -679,19 +679,19 @@ pub fn comb(n: i64, k: i64) -> Result<BigUint, ()> {
 
 /// Return the number of ways to arrange k items from n items.
 ///
-/// Returns Err(()) if n or k is negative.
+/// Returns Err(EDOM) if n or k is negative.
 /// Evaluates to n! / (n - k)! when k <= n and evaluates
 /// to zero when k > n.
 ///
 /// If k is not specified (None), then k defaults to n
 /// and the function returns n!.
-pub fn perm(n: i64, k: Option<i64>) -> Result<BigUint, ()> {
+pub fn perm(n: i64, k: Option<i64>) -> crate::Result<BigUint> {
     if n < 0 {
-        return Err(());
+        return Err(crate::Error::EDOM);
     }
     let n = n as u64;
     let k = match k {
-        Some(k) if k < 0 => return Err(()),
+        Some(k) if k < 0 => return Err(crate::Error::EDOM),
         Some(k) => k as u64,
         None => n,
     };

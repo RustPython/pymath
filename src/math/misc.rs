@@ -3,7 +3,27 @@
 use crate::{Error, Result, m};
 
 super::libm_simple!(@1 ceil, floor, trunc);
-super::libm_simple!(@2 nextafter);
+
+/// Return the next floating-point value after x towards y.
+///
+/// If steps is provided, move that many steps towards y.
+/// Steps must be non-negative.
+#[inline]
+pub fn nextafter(x: f64, y: f64, steps: Option<u64>) -> f64 {
+    match steps {
+        Some(n) => {
+            let mut result = x;
+            for _ in 0..n {
+                result = crate::m::nextafter(result, y);
+                if result == y {
+                    break;
+                }
+            }
+            result
+        }
+        None => crate::m::nextafter(x, y),
+    }
+}
 
 /// Return the absolute value of x.
 #[inline]
@@ -146,10 +166,10 @@ pub fn ulp(x: f64) -> f64 {
     if x.is_infinite() {
         return x;
     }
-    let x2 = super::nextafter(x, f64::INFINITY);
+    let x2 = nextafter(x, f64::INFINITY, None);
     if x2.is_infinite() {
         // Special case: x is the largest positive representable float
-        let x2 = super::nextafter(x, f64::NEG_INFINITY);
+        let x2 = nextafter(x, f64::NEG_INFINITY, None);
         return x - x2;
     }
     x2 - x

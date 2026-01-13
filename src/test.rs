@@ -3,7 +3,7 @@ use pyo3::{Python, prelude::*};
 
 /// Edge values for testing floating-point functions.
 /// Includes: zeros, infinities, various NaNs, subnormals, and values at different scales.
-pub(crate) const EDGE_VALUES: [f64; 30] = [
+pub(crate) const EDGE_VALUES: [f64; 64] = [
     // Zeros
     0.0,
     -0.0,
@@ -15,35 +15,79 @@ pub(crate) const EDGE_VALUES: [f64; 30] = [
     -f64::NAN,
     // Additional NaN with different payload (quiet NaN with payload 1)
     f64::from_bits(0x7FF8_0000_0000_0001_u64),
+    // Signaling NaN (sNaN) - may trigger FP exceptions on some platforms
+    f64::from_bits(0x7FF0_0000_0000_0001_u64),
     // Subnormal (denormalized) values
-    f64::MIN_POSITIVE * 0.5, // smallest subnormal
+    f64::MIN_POSITIVE * 0.5,
     -f64::MIN_POSITIVE * 0.5,
+    5e-324,
+    -5e-324,
     // Boundary values
-    f64::MIN_POSITIVE, // smallest positive normal
-    f64::MAX,          // largest finite
-    f64::MIN,          // most negative finite (not smallest!)
+    f64::MIN_POSITIVE,
+    f64::MAX,
+    f64::MIN,
     // Near-infinity large values
     f64::MAX * 0.5,
     -f64::MAX * 0.5,
     1e308,
     -1e308,
+    // Overflow/underflow thresholds for exp
+    710.0,
+    -745.0,
     // Small scale
     1e-10,
     -1e-10,
     1e-300,
+    -1e-300,
     // Normal scale
     1.0,
     -1.0,
     0.5,
     -0.5,
     2.0,
-    // Trigonometric special values (where sin/cos/tan have exact or near-zero results)
-    std::f64::consts::PI, // sin(PI) ≈ 0
+    -2.0,
+    3.0,  // for cbrt
+    -3.0,
+    // Values near 1.0 (log, expm1, log1p, acosh boundary)
+    1.0 - 1e-15,
+    1.0 + 1e-15,
+    f64::EPSILON,
+    1.0 - f64::EPSILON,
+    1.0 + f64::EPSILON,
+    // asin/acos domain boundaries [-1, 1]
+    1.0000000000000002,  // just outside domain (1 + eps)
+    -1.0000000000000002,
+    // atanh domain boundaries (-1, 1)
+    0.9999999999999999,  // just inside domain
+    -0.9999999999999999,
+    // log1p domain boundary (> -1)
+    -0.9999999999999999, // just above -1
+    -1.0 + 1e-15,        // very close to -1
+    // gamma/lgamma poles (negative integers)
+    -1.0,
+    -2.0,
+    -3.0,
+    -0.5, // gamma(-0.5) = -2*sqrt(pi)
+    // Mathematical constants
+    std::f64::consts::E,
+    std::f64::consts::LN_2,
+    std::f64::consts::LOG10_E,
+    // Trigonometric special values
+    std::f64::consts::PI,
     -std::f64::consts::PI,
-    std::f64::consts::FRAC_PI_2, // cos(PI/2) ≈ 0
+    std::f64::consts::FRAC_PI_2,
     -std::f64::consts::FRAC_PI_2,
-    std::f64::consts::FRAC_PI_4, // tan(PI/4) = 1
-    std::f64::consts::TAU,       // sin(2*PI) ≈ 0, cos(2*PI) = 1
+    std::f64::consts::FRAC_PI_4,
+    std::f64::consts::TAU,
+    1.5 * std::f64::consts::PI, // 3π/2
+    // Large values for trig (precision loss)
+    1e15,
+    -1e15,
+    // Near-integer values (ceil, floor, trunc, round)
+    0.49999999999999994,
+    0.50000000000000006,
+    -0.49999999999999994,
+    -0.50000000000000006,
 ];
 
 pub(crate) fn unwrap<'py>(

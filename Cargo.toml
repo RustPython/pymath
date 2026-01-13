@@ -22,6 +22,10 @@ _bigint = ["dep:num-traits", "dep:num-integer"]  # Internal feature. User must u
 # See also: https://github.com/python/cpython/issues/132763
 mul_add = []
 
+# For WASM and other targets without native libm
+[target.'cfg(not(any(unix, windows)))'.dependencies]
+libm = "0.2"
+
 [dependencies]
 libc = "0.2"
 num-complex = { version = "0.4", optional = true }

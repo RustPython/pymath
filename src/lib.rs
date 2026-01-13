@@ -5,7 +5,14 @@ pub mod math;
 
 // Internal modules
 mod err;
+// Native libm via FFI (unix/windows)
+#[cfg(any(unix, windows))]
 pub(crate) mod m;
+// Pure Rust libm for WASM and other targets
+#[cfg(not(any(unix, windows)))]
+#[path = "m_rust.rs"]
+pub(crate) mod m;
+#[cfg(any(unix, windows))]
 mod m_sys;
 #[cfg(test)]
 mod test;

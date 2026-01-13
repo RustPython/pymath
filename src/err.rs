@@ -44,7 +44,10 @@ pub(crate) fn set_errno(value: i32) {
     unsafe {
         *_errno() = value;
     }
-    #[cfg(all(unix, not(any(target_os = "linux", target_os = "android", target_os = "macos"))))]
+    #[cfg(all(
+        unix,
+        not(any(target_os = "linux", target_os = "android", target_os = "macos"))
+    ))]
     unsafe {
         // FreeBSD, NetBSD, OpenBSD, etc. use __error()
         *libc::__error() = value;
@@ -73,7 +76,10 @@ pub(crate) fn get_errno() -> i32 {
     unsafe {
         *_errno()
     }
-    #[cfg(all(unix, not(any(target_os = "linux", target_os = "android", target_os = "macos"))))]
+    #[cfg(all(
+        unix,
+        not(any(target_os = "linux", target_os = "android", target_os = "macos"))
+    ))]
     unsafe {
         // FreeBSD, NetBSD, OpenBSD, etc. use __error()
         *libc::__error()

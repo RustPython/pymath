@@ -726,25 +726,25 @@ mod tests {
         7,
         13,
         97,
-        127,  // table boundary in comb/perm
-        128,  // Table boundary + 1
+        127, // table boundary in comb/perm
+        128, // Table boundary + 1
         // Powers of 2 and boundaries
         64,
         63,   // 2^6 - 1
         65,   // 2^6 + 1
         1024,
-        65535,  // 2^16 - 1
-        65536,  // 2^16
-        65537,  // 2^16 + 1 (Fermat prime)
+        65535, // 2^16 - 1
+        65536, // 2^16
+        65537, // 2^16 + 1 (Fermat prime)
         // Factorial-relevant
-        12, // 12! = 479001600 fits in u32
-        13, // 13! overflows u32
-        20, // 20! fits in u64
-        21, // 21! overflows u64
+        12,  // 12! = 479001600 fits in u32
+        13,  // 13! overflows u32
+        20,  // 20! fits in u64
+        21,  // 21! overflows u64
         170, // factorial(170) is the largest that fits in f64
         171, // factorial(171) overflows f64
         // Comb/perm algorithm switching points
-        34,  // FAST_COMB_LIMITS1 boundary
+        34, // FAST_COMB_LIMITS1 boundary
         35,
         // Large values
         1_000_000,
@@ -768,8 +768,8 @@ mod tests {
         (1i64 << 62) - 1, // large but valid for isqrt
         1i64 << 62,       // exact power of 2
         // Near perfect squares
-        99,   // sqrt(99) = 9.949...
-        101,  // sqrt(101) = 10.049...
+        99,  // sqrt(99) = 9.949...
+        101, // sqrt(101) = 10.049...
     ];
 
     fn test_gcd_impl(args: &[i64]) {

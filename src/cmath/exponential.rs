@@ -329,8 +329,8 @@ mod tests {
 
     #[test]
     fn edgetest_sqrt() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_sqrt(re, im);
             }
         }
@@ -338,8 +338,8 @@ mod tests {
 
     #[test]
     fn edgetest_exp() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_exp(re, im);
             }
         }
@@ -347,8 +347,8 @@ mod tests {
 
     #[test]
     fn edgetest_log_n() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_log_n(re, im);
             }
         }
@@ -356,8 +356,8 @@ mod tests {
 
     #[test]
     fn edgetest_log10() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_log10(re, im);
             }
         }
@@ -374,8 +374,8 @@ mod tests {
             }
         }
         // Additional edge cases with imaginary parts
-        for &z_re in &EDGE_VALUES {
-            for &z_im in &EDGE_VALUES {
+        for &z_re in EDGE_VALUES {
+            for &z_im in EDGE_VALUES {
                 test_log(z_re, z_im, 2.0, 0.0);
                 test_log(z_re, z_im, 0.5, 0.0);
             }

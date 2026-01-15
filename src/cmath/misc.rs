@@ -212,8 +212,8 @@ mod tests {
 
     #[test]
     fn edgetest_phase() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_phase_impl(re, im);
             }
         }
@@ -277,8 +277,8 @@ mod tests {
 
     #[test]
     fn edgetest_polar() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_polar_impl(re, im);
             }
         }
@@ -324,8 +324,8 @@ mod tests {
 
     #[test]
     fn edgetest_rect() {
-        for &r in &EDGE_VALUES {
-            for &phi in &EDGE_VALUES {
+        for &r in EDGE_VALUES {
+            for &phi in EDGE_VALUES {
                 test_rect_impl(r, phi);
             }
         }

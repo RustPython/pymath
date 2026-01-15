@@ -3,7 +3,7 @@ use pyo3::{Python, prelude::*};
 
 /// Edge values for testing floating-point functions.
 /// Includes: zeros, infinities, various NaNs, subnormals, and values at different scales.
-pub(crate) const EDGE_VALUES: [f64; 64] = [
+pub(crate) const EDGE_VALUES: &[f64] = &[
     // Zeros
     0.0,
     -0.0,
@@ -24,6 +24,7 @@ pub(crate) const EDGE_VALUES: [f64; 64] = [
     -5e-324,
     // Boundary values
     f64::MIN_POSITIVE,
+    f64::MIN_POSITIVE * 2.0,
     f64::MAX,
     f64::MIN,
     // Near-infinity large values
@@ -33,12 +34,16 @@ pub(crate) const EDGE_VALUES: [f64; 64] = [
     -1e308,
     // Overflow/underflow thresholds for exp
     710.0,
+    709.782712893384,
     -745.0,
+    -745.1332191019411,
     // Small scale
     1e-10,
     -1e-10,
     1e-300,
     -1e-300,
+    1e-308,
+    -1e-308,
     // Normal scale
     1.0,
     -1.0,
@@ -46,6 +51,8 @@ pub(crate) const EDGE_VALUES: [f64; 64] = [
     -0.5,
     2.0,
     -2.0,
+    1.5,
+    -1.5,
     3.0,  // for cbrt
     -3.0,
     // Values near 1.0 (log, expm1, log1p, acosh boundary)
@@ -63,6 +70,7 @@ pub(crate) const EDGE_VALUES: [f64; 64] = [
     // log1p domain boundary (> -1)
     -0.9999999999999999, // just above -1
     -1.0 + 1e-15,        // very close to -1
+    -1.0000000000000002, // just below -1
     // gamma/lgamma poles (negative integers)
     -1.0,
     -2.0,
@@ -78,6 +86,7 @@ pub(crate) const EDGE_VALUES: [f64; 64] = [
     std::f64::consts::FRAC_PI_2,
     -std::f64::consts::FRAC_PI_2,
     std::f64::consts::FRAC_PI_4,
+    -std::f64::consts::FRAC_PI_4,
     std::f64::consts::TAU,
     1.5 * std::f64::consts::PI, // 3π/2
     // Large values for trig (precision loss)
@@ -89,6 +98,7 @@ pub(crate) const EDGE_VALUES: [f64; 64] = [
     -0.49999999999999994,
     -0.50000000000000006,
 ];
+
 
 pub(crate) fn unwrap<'py>(
     py: Python<'py>,

@@ -206,14 +206,14 @@ mod tests {
 
     #[test]
     fn edgetest_degrees() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_degrees(x);
         }
     }
 
     #[test]
     fn edgetest_radians() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_radians(x);
         }
     }
@@ -262,8 +262,8 @@ mod tests {
 
     #[test]
     fn edgetest_hypot() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_hypot(&[x, y]);
             }
         }

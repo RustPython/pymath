@@ -421,8 +421,8 @@ mod tests {
 
     #[test]
     fn edgetest_sin() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_sin(re, im);
             }
         }
@@ -430,8 +430,8 @@ mod tests {
 
     #[test]
     fn edgetest_cos() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_cos(re, im);
             }
         }
@@ -439,8 +439,8 @@ mod tests {
 
     #[test]
     fn edgetest_tan() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_tan(re, im);
             }
         }
@@ -448,8 +448,8 @@ mod tests {
 
     #[test]
     fn edgetest_sinh() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_sinh(re, im);
             }
         }
@@ -457,8 +457,8 @@ mod tests {
 
     #[test]
     fn edgetest_cosh() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_cosh(re, im);
             }
         }
@@ -466,8 +466,8 @@ mod tests {
 
     #[test]
     fn edgetest_tanh() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_tanh(re, im);
             }
         }
@@ -475,8 +475,8 @@ mod tests {
 
     #[test]
     fn edgetest_asin() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_asin(re, im);
             }
         }
@@ -484,8 +484,8 @@ mod tests {
 
     #[test]
     fn edgetest_acos() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_acos(re, im);
             }
         }
@@ -493,8 +493,8 @@ mod tests {
 
     #[test]
     fn edgetest_atan() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_atan(re, im);
             }
         }
@@ -502,8 +502,8 @@ mod tests {
 
     #[test]
     fn edgetest_asinh() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_asinh(re, im);
             }
         }
@@ -511,8 +511,8 @@ mod tests {
 
     #[test]
     fn edgetest_acosh() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_acosh(re, im);
             }
         }
@@ -520,8 +520,8 @@ mod tests {
 
     #[test]
     fn edgetest_atanh() {
-        for &re in &EDGE_VALUES {
-            for &im in &EDGE_VALUES {
+        for &re in EDGE_VALUES {
+            for &im in EDGE_VALUES {
                 test_atanh(re, im);
             }
         }

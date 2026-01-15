@@ -28,14 +28,41 @@ pub fn phase(z: Complex64) -> Result<f64> {
     }
 }
 
+#[inline]
+fn c_abs_raw(z: Complex64) -> f64 {
+    if !z.re.is_finite() || !z.im.is_finite() {
+        // C99 rules: if either part is infinite, return infinity,
+        // even if the other part is NaN.
+        if z.re.is_infinite() {
+            return m::fabs(z.re);
+        }
+        if z.im.is_infinite() {
+            return m::fabs(z.im);
+        }
+        return f64::NAN;
+    }
+    m::hypot(z.re, z.im)
+}
+
+#[inline]
+fn c_abs_checked(z: Complex64) -> Result<f64> {
+    if !z.re.is_finite() || !z.im.is_finite() {
+        return Ok(c_abs_raw(z));
+    }
+    crate::err::set_errno(0);
+    let r = m::hypot(z.re, z.im);
+    if r.is_infinite() {
+        Err(Error::ERANGE)
+    } else {
+        Ok(r)
+    }
+}
+
 /// Convert z to polar coordinates (r, phi).
 #[inline]
 pub fn polar(z: Complex64) -> Result<(f64, f64)> {
     let phi = m::atan2(z.im, z.re);
-    let r = m::hypot(z.re, z.im);
-    if r.is_infinite() && z.re.is_finite() && z.im.is_finite() {
-        return Err(Error::ERANGE);
-    }
+    let r = c_abs_checked(z)?;
     Ok((r, phi))
 }
 
@@ -94,7 +121,7 @@ pub fn isinf(z: Complex64) -> bool {
 /// Complex absolute value (magnitude).
 #[inline]
 pub fn abs(z: Complex64) -> f64 {
-    m::hypot(z.re, z.im)
+    c_abs_raw(z)
 }
 
 /// Determine whether two complex numbers are close in value.

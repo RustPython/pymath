@@ -4,7 +4,7 @@ use super::{
     CM_LARGE_DOUBLE, CM_LOG_LARGE_DOUBLE, INF, M_LN2, N, P, P12, P14, P34, U, c, special_type,
     special_value,
 };
-use crate::{Error, Result, m};
+use crate::{Error, Result, m, mul_add};
 use num_complex::Complex64;
 
 // Local constants
@@ -160,7 +160,8 @@ pub(crate) fn ln(z: Complex64) -> Result<Complex64> {
         if (0.71..=1.73).contains(&h) {
             let am = if ax > ay { ax } else { ay }; // max(ax, ay)
             let an = if ax > ay { ay } else { ax }; // min(ax, ay)
-            m::log1p((am - 1.0) * (am + 1.0) + an * an) / 2.0
+            let log1p_arg = mul_add(am - 1.0, am + 1.0, an * an);
+            m::log1p(log1p_arg) / 2.0
         } else {
             m::log(h)
         }

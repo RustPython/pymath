@@ -715,7 +715,7 @@ mod tests {
     use pyo3::prelude::*;
 
     /// Edge i64 values for testing integer math functions (gcd, lcm, isqrt, factorial, comb, perm)
-    const EDGE_I64: [i64; 44] = [
+    const EDGE_I64: &[i64] = &[
         // Zero and small values
         0,
         1,
@@ -982,9 +982,9 @@ mod tests {
     #[test]
     fn edgetest_gcd() {
         // Test all edge values - gcd handles arbitrary large integers
-        for &a in &EDGE_I64 {
+        for &a in EDGE_I64 {
             test_gcd_impl(&[a]);
-            for &b in &EDGE_I64 {
+            for &b in EDGE_I64 {
                 test_gcd_impl(&[a, b]);
             }
         }
@@ -997,9 +997,9 @@ mod tests {
     #[test]
     fn edgetest_lcm() {
         // Test all edge values - lcm handles arbitrary large integers
-        for &a in &EDGE_I64 {
+        for &a in EDGE_I64 {
             test_lcm_impl(&[a]);
-            for &b in &EDGE_I64 {
+            for &b in EDGE_I64 {
                 test_lcm_impl(&[a, b]);
             }
         }
@@ -1011,7 +1011,7 @@ mod tests {
 
     #[test]
     fn edgetest_isqrt() {
-        for &n in &EDGE_I64 {
+        for &n in EDGE_I64 {
             test_isqrt_impl(n);
         }
         // Additional boundary cases
@@ -1031,7 +1031,7 @@ mod tests {
 
     #[test]
     fn edgetest_factorial() {
-        for &n in &EDGE_I64 {
+        for &n in EDGE_I64 {
             // factorial only makes sense for reasonable n values
             if n >= -10 && n <= 170 {
                 test_factorial_impl(n);

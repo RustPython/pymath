@@ -196,8 +196,7 @@ mod tests {
                 }
                 Err(e) => {
                     // Python raised an exception - check we got an error too
-                    if rs_result.is_ok() {
-                        let rs_val = rs_result.unwrap();
+                    if let Ok(rs_val) = rs_result {
                         if e.is_instance_of::<pyo3::exceptions::PyValueError>(py) {
                             panic!("phase({re}, {im}): py raised ValueError but rs={rs_val}");
                         } else if e.is_instance_of::<pyo3::exceptions::PyOverflowError>(py) {

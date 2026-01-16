@@ -1033,7 +1033,7 @@ mod tests {
     fn edgetest_factorial() {
         for &n in EDGE_I64 {
             // factorial only makes sense for reasonable n values
-            if n >= -10 && n <= 170 {
+            if (-10..=170).contains(&n) {
                 test_factorial_impl(n);
             }
         }
@@ -1051,7 +1051,7 @@ mod tests {
         let vals: Vec<i64> = EDGE_I64
             .iter()
             .copied()
-            .filter(|&x| x >= -10 && x <= 200)
+            .filter(|&x| (-10..=200).contains(&x))
             .collect();
         for &n in &vals {
             for &k in &vals {
@@ -1070,7 +1070,7 @@ mod tests {
         let vals: Vec<i64> = EDGE_I64
             .iter()
             .copied()
-            .filter(|&x| x >= -10 && x <= 100)
+            .filter(|&x| (-10..=100).contains(&x))
             .collect();
         for &n in &vals {
             for &k in &vals {

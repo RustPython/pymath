@@ -1,3 +1,6 @@
+// Allow excessive precision in edge values - these are intentional test cases
+#![allow(clippy::excessive_precision)]
+
 use crate::Error;
 use pyo3::{Python, prelude::*};
 
@@ -107,7 +110,7 @@ pub(crate) fn unwrap<'py>(
 ) -> Option<(f64, f64)> {
     match py_v {
         Ok(py_v) => {
-            let py_v: f64 = py_v.extract().ok().expect("failed to extract");
+            let py_v: f64 = py_v.extract().expect("failed to extract");
             Some((py_v, v.unwrap()))
         }
         Err(e) => {

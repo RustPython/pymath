@@ -135,50 +135,50 @@ mod tests {
     // Trigonometric edge tests
     #[test]
     fn edgetest_sin() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_sin(x);
         }
     }
 
     #[test]
     fn edgetest_cos() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_cos(x);
         }
     }
 
     #[test]
     fn edgetest_tan() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_tan(x);
         }
     }
 
     #[test]
     fn edgetest_asin() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_asin(x);
         }
     }
 
     #[test]
     fn edgetest_acos() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_acos(x);
         }
     }
 
     #[test]
     fn edgetest_atan() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_atan(x);
         }
     }
 
     #[test]
     fn edgetest_atan2() {
-        for &y in &crate::test::EDGE_VALUES {
-            for &x in &crate::test::EDGE_VALUES {
+        for &y in crate::test::EDGE_VALUES {
+            for &x in crate::test::EDGE_VALUES {
                 test_atan2(y, x);
             }
         }
@@ -187,42 +187,42 @@ mod tests {
     // Hyperbolic edge tests
     #[test]
     fn edgetest_tanh() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_tanh(x);
         }
     }
 
     #[test]
     fn edgetest_asinh() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_asinh(x);
         }
     }
 
     #[test]
     fn edgetest_sinh() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_sinh(x);
         }
     }
 
     #[test]
     fn edgetest_cosh() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_cosh(x);
         }
     }
 
     #[test]
     fn edgetest_acosh() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_acosh(x);
         }
     }
 
     #[test]
     fn edgetest_atanh() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_atanh(x);
         }
     }

@@ -334,71 +334,71 @@ mod tests {
 
     #[test]
     fn edgetest_exp() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_exp(x);
         }
     }
 
     #[test]
     fn edgetest_exp2() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_exp2(x);
         }
     }
 
     #[test]
     fn edgetest_expm1() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_expm1(x);
         }
     }
 
     #[test]
     fn edgetest_sqrt() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_sqrt(x);
         }
     }
 
     #[test]
     fn edgetest_cbrt() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_cbrt(x);
         }
     }
 
     #[test]
     fn edgetest_log_n() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_log_n(x);
         }
     }
 
     #[test]
     fn edgetest_log10() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_log10(x);
         }
     }
 
     #[test]
     fn edgetest_log2() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_log2(x);
         }
     }
 
     #[test]
     fn edgetest_log1p() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_log1p(x);
         }
     }
 
     #[test]
     fn edgetest_pow() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_pow(x, y);
             }
         }

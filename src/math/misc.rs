@@ -207,7 +207,7 @@ mod tests {
     use super::*;
 
     /// Edge integer values for testing functions like ldexp
-    const EDGE_INTS: [i32; 9] = [0, 1, -1, 100, -100, 1024, -1024, i32::MAX, i32::MIN];
+    const EDGE_INTS: &[i32] = &[0, 1, -1, 100, -100, 1024, -1024, i32::MAX, i32::MIN];
 
     fn test_ldexp(x: f64, i: i32) {
         use pyo3::prelude::*;
@@ -310,15 +310,15 @@ mod tests {
 
     #[test]
     fn edgetest_frexp() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_frexp(x);
         }
     }
 
     #[test]
     fn edgetest_ldexp() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &i in &EDGE_INTS {
+        for &x in crate::test::EDGE_VALUES {
+            for &i in EDGE_INTS {
                 test_ldexp(x, i);
             }
         }
@@ -326,15 +326,15 @@ mod tests {
 
     #[test]
     fn edgetest_modf() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_modf(x);
         }
     }
 
     #[test]
     fn edgetest_fmod() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_fmod(x, y);
             }
         }
@@ -342,8 +342,8 @@ mod tests {
 
     #[test]
     fn edgetest_remainder() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_remainder(x, y);
             }
         }
@@ -351,8 +351,8 @@ mod tests {
 
     #[test]
     fn edgetest_copysign() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_copysign(x, y);
             }
         }
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn edgetest_ulp() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_ulp(x);
         }
     }
@@ -573,8 +573,8 @@ mod tests {
 
     #[test]
     fn edgetest_fma() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_fma_impl(x, y, 0.0);
                 test_fma_impl(x, y, 1.0);
             }

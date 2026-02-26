@@ -178,8 +178,7 @@ pub(crate) mod tests {
                 }
                 Err(e) => {
                     // CPython raised an exception - check we got an error too
-                    if rs_result.is_ok() {
-                        let rs = rs_result.unwrap();
+                    if let Ok(rs) = rs_result {
                         // Some special cases may return values for domain errors in Python
                         // Check if it's a domain error
                         if e.is_instance_of::<pyo3::exceptions::PyValueError>(py) {

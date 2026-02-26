@@ -715,7 +715,7 @@ mod tests {
     use pyo3::prelude::*;
 
     /// Edge i64 values for testing integer math functions (gcd, lcm, isqrt, factorial, comb, perm)
-    const EDGE_I64: [i64; 24] = [
+    const EDGE_I64: &[i64] = &[
         // Zero and small values
         0,
         1,
@@ -726,27 +726,50 @@ mod tests {
         7,
         13,
         97,
-        // Powers of 2
+        127, // table boundary in comb/perm
+        128, // Table boundary + 1
+        // Powers of 2 and boundaries
         64,
+        63,   // 2^6 - 1
+        65,   // 2^6 + 1
         1024,
-        65536,
+        65535, // 2^16 - 1
+        65536, // 2^16
+        65537, // 2^16 + 1 (Fermat prime)
         // Factorial-relevant
-        20, // 20! fits in u64
-        21, // 21! overflows u64
+        12,  // 12! = 479001600 fits in u32
+        13,  // 13! overflows u32
+        20,  // 20! fits in u64
+        21,  // 21! overflows u64
+        170, // factorial(170) is the largest that fits in f64
+        171, // factorial(171) overflows f64
+        // Comb/perm algorithm switching points
+        34, // FAST_COMB_LIMITS1 boundary
+        35,
         // Large values
         1_000_000,
         -1_000_000,
         i32::MAX as i64,
+        i32::MAX as i64 + 1,
         i32::MIN as i64,
+        i32::MIN as i64 - 1,
         // Near i64 bounds
         i64::MAX,
         i64::MIN,
         i64::MAX - 1,
         i64::MIN + 1,
         // Square root boundaries
-        (1i64 << 31) - 1, // sqrt fits in u32
-        1i64 << 32,       // sqrt boundary
+        (1i64 << 15) - 1, // 32767, sqrt = 181
+        1i64 << 16,       // 65536, sqrt = 256 (exact)
+        (1i64 << 31) - 1, // sqrt fits in u16
+        1i64 << 32,       // sqrt boundary (exact power of 2)
+        (1i64 << 32) - 1, // near sqrt boundary
+        (1i64 << 32) + 1, // just above sqrt boundary
         (1i64 << 62) - 1, // large but valid for isqrt
+        1i64 << 62,       // exact power of 2
+        // Near perfect squares
+        99,  // sqrt(99) = 9.949...
+        101, // sqrt(101) = 10.049...
     ];
 
     fn test_gcd_impl(args: &[i64]) {
@@ -959,9 +982,9 @@ mod tests {
     #[test]
     fn edgetest_gcd() {
         // Test all edge values - gcd handles arbitrary large integers
-        for &a in &EDGE_I64 {
+        for &a in EDGE_I64 {
             test_gcd_impl(&[a]);
-            for &b in &EDGE_I64 {
+            for &b in EDGE_I64 {
                 test_gcd_impl(&[a, b]);
             }
         }
@@ -974,9 +997,9 @@ mod tests {
     #[test]
     fn edgetest_lcm() {
         // Test all edge values - lcm handles arbitrary large integers
-        for &a in &EDGE_I64 {
+        for &a in EDGE_I64 {
             test_lcm_impl(&[a]);
-            for &b in &EDGE_I64 {
+            for &b in EDGE_I64 {
                 test_lcm_impl(&[a, b]);
             }
         }
@@ -988,7 +1011,7 @@ mod tests {
 
     #[test]
     fn edgetest_isqrt() {
-        for &n in &EDGE_I64 {
+        for &n in EDGE_I64 {
             test_isqrt_impl(n);
         }
         // Additional boundary cases
@@ -1008,9 +1031,9 @@ mod tests {
 
     #[test]
     fn edgetest_factorial() {
-        for &n in &EDGE_I64 {
+        for &n in EDGE_I64 {
             // factorial only makes sense for reasonable n values
-            if n >= -10 && n <= 170 {
+            if (-10..=170).contains(&n) {
                 test_factorial_impl(n);
             }
         }
@@ -1028,7 +1051,7 @@ mod tests {
         let vals: Vec<i64> = EDGE_I64
             .iter()
             .copied()
-            .filter(|&x| x >= -10 && x <= 200)
+            .filter(|&x| (-10..=200).contains(&x))
             .collect();
         for &n in &vals {
             for &k in &vals {
@@ -1047,7 +1070,7 @@ mod tests {
         let vals: Vec<i64> = EDGE_I64
             .iter()
             .copied()
-            .filter(|&x| x >= -10 && x <= 100)
+            .filter(|&x| (-10..=100).contains(&x))
             .collect();
         for &n in &vals {
             for &k in &vals {

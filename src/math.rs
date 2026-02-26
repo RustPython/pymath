@@ -114,17 +114,19 @@ pub fn hypot(coords: &[f64]) -> f64 {
 
     let mut max = 0.0_f64;
     let mut found_nan = false;
-    let abs_coords: Vec<f64> = coords
-        .iter()
-        .map(|&x| {
-            let ax = x.abs();
-            found_nan |= ax.is_nan();
-            if ax > max {
-                max = ax;
-            }
-            ax
-        })
-        .collect();
+    let mut abs_coords = Vec::with_capacity(n);
+
+    for &x in coords {
+        let ax = x.abs();
+        // Use is_nan() check separately to prevent compiler from
+        // reordering NaN detection relative to max comparison
+        if ax.is_nan() {
+            found_nan = true;
+        } else if ax > max {
+            max = ax;
+        }
+        abs_coords.push(ax);
+    }
 
     aggregate::vector_norm(&abs_coords, max, found_nan)
 }
@@ -206,14 +208,14 @@ mod tests {
 
     #[test]
     fn edgetest_degrees() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_degrees(x);
         }
     }
 
     #[test]
     fn edgetest_radians() {
-        for &x in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
             test_radians(x);
         }
     }
@@ -221,9 +223,9 @@ mod tests {
     // Constants test
     #[test]
     fn test_constants() {
-        assert!((PI - 3.141592653589793).abs() < 1e-15);
-        assert!((E - 2.718281828459045).abs() < 1e-15);
-        assert!((TAU - 6.283185307179586).abs() < 1e-15);
+        assert_eq!(PI, std::f64::consts::PI);
+        assert_eq!(E, std::f64::consts::E);
+        assert_eq!(TAU, std::f64::consts::TAU);
         assert!(INF.is_infinite() && INF > 0.0);
         assert!(NAN.is_nan());
     }
@@ -262,8 +264,8 @@ mod tests {
 
     #[test]
     fn edgetest_hypot() {
-        for &x in &crate::test::EDGE_VALUES {
-            for &y in &crate::test::EDGE_VALUES {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
                 test_hypot(&[x, y]);
             }
         }

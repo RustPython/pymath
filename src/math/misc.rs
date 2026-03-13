@@ -391,6 +391,64 @@ mod tests {
     }
 
     #[test]
+    fn regression_remainder_halfway_even_cases() {
+        // These cases exercise the half-way branch in CPython's custom
+        // m_remainder implementation, where ties are resolved toward the
+        // even multiple of y.
+        let cases = [
+            ((6.0, 4.0), 0xc000_0000_0000_0000_u64),  // -2.0
+            ((3.0, 2.0), 0xbff0_0000_0000_0000_u64),  // -1.0
+            ((5.0, 2.0), 0x3ff0_0000_0000_0000_u64),  // 1.0
+            ((-6.0, 4.0), 0x4000_0000_0000_0000_u64), // 2.0
+            ((-5.0, 2.0), 0xbff0_0000_0000_0000_u64), // -1.0
+            ((1.5, 1.0), 0xbfe0_0000_0000_0000_u64),  // -0.5
+            ((2.5, 1.0), 0x3fe0_0000_0000_0000_u64),  // 0.5
+            ((3.5, 1.0), 0xbfe0_0000_0000_0000_u64),  // -0.5
+            ((4.5, 1.0), 0x3fe0_0000_0000_0000_u64),  // 0.5
+            ((5.5, 1.0), 0xbfe0_0000_0000_0000_u64),  // -0.5
+        ];
+
+        for &((x, y), expected_bits) in &cases {
+            let r = remainder(x, y).unwrap();
+            assert_eq!(
+                r.to_bits(),
+                expected_bits,
+                "remainder({x}, {y}) = {r} ({:#x}), expected {:#x}",
+                r.to_bits(),
+                expected_bits
+            );
+            test_remainder(x, y);
+        }
+    }
+
+    #[test]
+    fn regression_remainder_boundary_and_signed_zero_cases() {
+        // These cases pin the sign of zero and the behavior immediately
+        // around the half-way boundary.
+        let just_below_half = f64::from_bits(0x3fdf_ffff_ffff_ffff);
+        let just_above_half = f64::from_bits(0x3fe0_0000_0000_0001);
+        let cases = [
+            ((4.0, 2.0), 0x0000_0000_0000_0000_u64),  // +0.0
+            ((-4.0, 2.0), 0x8000_0000_0000_0000_u64), // -0.0
+            ((4.0, -2.0), 0x0000_0000_0000_0000_u64), // +0.0
+            ((just_below_half, 1.0), 0x3fdf_ffff_ffff_ffff_u64),
+            ((just_above_half, 1.0), 0xbfdf_ffff_ffff_fffe_u64),
+        ];
+
+        for &((x, y), expected_bits) in &cases {
+            let r = remainder(x, y).unwrap();
+            assert_eq!(
+                r.to_bits(),
+                expected_bits,
+                "remainder({x}, {y}) = {r} ({:#x}), expected {:#x}",
+                r.to_bits(),
+                expected_bits
+            );
+            test_remainder(x, y);
+        }
+    }
+
+    #[test]
     fn edgetest_copysign() {
         for &x in crate::test::EDGE_VALUES {
             for &y in crate::test::EDGE_VALUES {

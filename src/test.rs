@@ -56,7 +56,7 @@ pub(crate) const EDGE_VALUES: &[f64] = &[
     -2.0,
     1.5,
     -1.5,
-    3.0,  // for cbrt
+    3.0, // for cbrt
     -3.0,
     // Values near 1.0 (log, expm1, log1p, acosh boundary)
     1.0 - 1e-15,
@@ -65,10 +65,10 @@ pub(crate) const EDGE_VALUES: &[f64] = &[
     1.0 - f64::EPSILON,
     1.0 + f64::EPSILON,
     // asin/acos domain boundaries [-1, 1]
-    1.0000000000000002,  // just outside domain (1 + eps)
+    1.0000000000000002, // just outside domain (1 + eps)
     -1.0000000000000002,
     // atanh domain boundaries (-1, 1)
-    0.9999999999999999,  // just inside domain
+    0.9999999999999999, // just inside domain
     -0.9999999999999999,
     // log1p domain boundary (> -1)
     -0.9999999999999999, // just above -1
@@ -101,7 +101,6 @@ pub(crate) const EDGE_VALUES: &[f64] = &[
     -0.49999999999999994,
     -0.50000000000000006,
 ];
-
 
 pub(crate) fn unwrap<'py>(
     py: Python<'py>,

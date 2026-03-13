@@ -177,26 +177,31 @@ pub(crate) fn ln(z: Complex64) -> Result<Complex64> {
 /// If base is Some(b), returns log(z) / log(b).
 #[inline]
 pub fn log(z: Complex64, base: Option<Complex64>) -> Result<Complex64> {
-    // c_log always returns a value, but sets errno for special cases.
-    // The error check happens at the end of cmath_log_impl.
-    // For log(z) without base: z=0 raises EDOM
-    // For log(z, base): z=0 doesn't raise because c_log(base) clears errno
-    let z_is_zero = z.re == 0.0 && z.im == 0.0;
+    let (log_z, mut err) = c_log(z);
     match base {
-        None => {
-            // No base: raise error if z=0
-            if z_is_zero {
-                return Err(Error::EDOM);
-            }
-            ln(z)
-        }
+        None => err.map_or(Ok(log_z), Err),
         Some(b) => {
-            // With base: z=0 is allowed (second ln clears the "errno")
-            let log_z = ln(z)?;
-            let log_b = ln(b)?;
-            // Use _Py_c_quot-style division to preserve sign of zero
-            Ok(c_quot(log_z, log_b))
+            // Like cmath_log_impl, the second c_log call overwrites
+            // any pending error from the first one.
+            let (log_b, base_err) = c_log(b);
+            err = base_err;
+            let (q, quot_err) = c_quot(log_z, log_b);
+            if let Some(e) = quot_err {
+                err = Some(e);
+            }
+            err.map_or(Ok(q), Err)
         }
+    }
+}
+
+/// c_log behavior: always returns a value, but reports EDOM for zero.
+#[inline]
+fn c_log(z: Complex64) -> (Complex64, Option<Error>) {
+    let r = ln(z).expect("ln handles special values without failing");
+    if z.re == 0.0 && z.im == 0.0 {
+        (r, Some(Error::EDOM))
+    } else {
+        (r, None)
     }
 }
 
@@ -204,13 +209,15 @@ pub fn log(z: Complex64, base: Option<Complex64>) -> Result<Complex64> {
 /// This preserves the sign of zero correctly and recovers infinities
 /// from NaN results per C11 Annex G.5.2.
 #[inline]
-fn c_quot(a: Complex64, b: Complex64) -> Complex64 {
+fn c_quot(a: Complex64, b: Complex64) -> (Complex64, Option<Error>) {
     let abs_breal = m::fabs(b.re);
     let abs_bimag = m::fabs(b.im);
+    let mut err = None;
 
     let mut r = if abs_breal >= abs_bimag {
         if abs_breal == 0.0 {
-            Complex64::new(f64::NAN, f64::NAN)
+            err = Some(Error::EDOM);
+            Complex64::new(0.0, 0.0)
         } else {
             let ratio = b.im / b.re;
             let denom = b.re + b.im * ratio;
@@ -244,7 +251,7 @@ fn c_quot(a: Complex64, b: Complex64) -> Complex64 {
         }
     }
 
-    r
+    (r, err)
 }
 
 /// Complex base-10 logarithm.
@@ -325,6 +332,53 @@ mod tests {
         });
     }
 
+    fn test_log_error(z: Complex64, base: Complex64) {
+        use pyo3::prelude::*;
+
+        let rs_result = log(z, Some(base));
+
+        Python::attach(|py| {
+            let cmath = pyo3::types::PyModule::import(py, "cmath").unwrap();
+            let py_z = pyo3::types::PyComplex::from_doubles(py, z.re, z.im);
+            let py_base = pyo3::types::PyComplex::from_doubles(py, base.re, base.im);
+            let py_result = cmath.getattr("log").unwrap().call1((py_z, py_base));
+
+            match py_result {
+                Ok(result) => {
+                    use pyo3::types::PyComplexMethods;
+                    let c = result.cast::<pyo3::types::PyComplex>().unwrap();
+                    panic!(
+                        "log({}+{}j, {}+{}j): expected ValueError, got ({}, {})",
+                        z.re,
+                        z.im,
+                        base.re,
+                        base.im,
+                        c.real(),
+                        c.imag()
+                    );
+                }
+                Err(err) => {
+                    assert!(
+                        err.is_instance_of::<pyo3::exceptions::PyValueError>(py),
+                        "log({}+{}j, {}+{}j): expected ValueError, got {err:?}",
+                        z.re,
+                        z.im,
+                        base.re,
+                        base.im,
+                    );
+                    assert!(
+                        matches!(rs_result, Err(crate::Error::EDOM)),
+                        "log({}+{}j, {}+{}j): expected Err(EDOM), got {rs_result:?}",
+                        z.re,
+                        z.im,
+                        base.re,
+                        base.im,
+                    );
+                }
+            }
+        });
+    }
+
     use crate::test::EDGE_VALUES;
 
     #[test]
@@ -379,6 +433,29 @@ mod tests {
                 test_log(z_re, z_im, 2.0, 0.0);
                 test_log(z_re, z_im, 0.5, 0.0);
             }
+        }
+    }
+
+    #[test]
+    fn regression_c_quot_zero_denominator_sets_edom() {
+        let (q, err) = c_quot(Complex64::new(2.0, -3.0), Complex64::new(0.0, 0.0));
+        assert_eq!(err, Some(crate::Error::EDOM));
+        assert_eq!(q.re.to_bits(), 0.0f64.to_bits());
+        assert_eq!(q.im.to_bits(), 0.0f64.to_bits());
+    }
+
+    #[test]
+    fn regression_log_zero_quotient_denominator_raises_edom() {
+        let cases = [
+            (Complex64::new(2.0, 0.0), Complex64::new(1.0, 0.0)),
+            (Complex64::new(1.0, 0.0), Complex64::new(1.0, 0.0)),
+            (Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0)),
+            (Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)),
+            (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)),
+        ];
+
+        for (z, base) in cases {
+            test_log_error(z, base);
         }
     }
 

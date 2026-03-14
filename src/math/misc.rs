@@ -10,6 +10,12 @@ super::libm_simple!(@1 ceil, floor, trunc);
 /// manipulation on the IEEE 754 representation. Steps that overshoot y
 /// are clamped so the result never passes y.
 ///
+/// CPython's math_nextafter_impl accepts a Python integer for steps,
+/// rejects negative values, and saturates overflows to UINT64_MAX. This
+/// Rust API takes `Option<u64>`, so negative rejection and big-int
+/// saturation are structurally unnecessary. The caller (e.g. RustPython)
+/// should handle Python int conversion and negative checks before calling.
+///
 /// See math_nextafter_impl in mathmodule.c.
 #[inline]
 pub fn nextafter(x: f64, y: f64, steps: Option<u64>) -> f64 {
@@ -39,13 +45,13 @@ pub fn nextafter(x: f64, y: f64, steps: Option<u64>) -> f64 {
         // opposite signs — may need to cross zero
         // ax + ay can never overflow because bit 63 is cleared in both
         if ax + ay <= usteps {
-            return y;
+            y
         } else if ax < usteps {
             // cross zero: remaining steps land on y's side
-            return f64::from_bits((uy & SIGN_BIT) | (usteps - ax));
+            f64::from_bits((uy & SIGN_BIT) | (usteps - ax))
         } else {
             ux -= usteps;
-            return f64::from_bits(ux);
+            f64::from_bits(ux)
         }
     } else if ax > ay {
         // same sign, moving toward zero
@@ -219,6 +225,12 @@ pub fn fmod(x: f64, y: f64) -> Result<f64> {
 }
 
 /// Return the IEEE 754-style remainder of x with respect to y.
+///
+/// CPython implements this from scratch using fmod (m_remainder in
+/// mathmodule.c) rather than calling the C library's remainder().
+/// We delegate to libm's remainder() which is correct on all platforms
+/// where it conforms to IEEE 754. If you find a platform where the
+/// results differ from CPython, please file a bug.
 #[inline]
 pub fn remainder(x: f64, y: f64) -> Result<f64> {
     super::math_2(x, y, crate::m::remainder)

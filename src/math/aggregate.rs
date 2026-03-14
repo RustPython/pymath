@@ -231,6 +231,11 @@ pub fn vector_norm(vec: &[f64], max: f64, found_nan: bool) -> f64 {
 ///
 /// The points are given as sequences of coordinates.
 /// Uses high-precision vector_norm algorithm.
+///
+/// Panics if `p` and `q` have different lengths. CPython raises ValueError
+/// for mismatched dimensions, but in this Rust API the caller is expected
+/// to guarantee equal-length slices. A length mismatch is a programming
+/// error, not a runtime condition.
 pub fn dist(p: &[f64], q: &[f64]) -> f64 {
     assert_eq!(
         p.len(),
@@ -261,24 +266,52 @@ pub fn dist(p: &[f64], q: &[f64]) -> f64 {
 
 /// Return the sum of products of values from two sequences (float version).
 ///
-/// Uses TripleLength arithmetic for high precision.
-/// Equivalent to sum(p[i] * q[i] for i in range(len(p))).
-pub fn sumprod(p: &[f64], q: &[f64]) -> f64 {
-    assert_eq!(p.len(), q.len(), "Inputs are not the same length");
-
-    let mut flt_total = TL_ZERO;
-
-    for (&pi, &qi) in p.iter().zip(q.iter()) {
-        let new_flt_total = tl_fma(pi, qi, flt_total);
-        if new_flt_total.hi.is_finite() {
-            flt_total = new_flt_total;
-        } else {
-            // Overflow or special value, fall back to simple sum
-            return p.iter().zip(q.iter()).map(|(a, b)| a * b).sum();
-        }
+/// Uses TripleLength arithmetic for the fast path, then falls back to
+/// ordinary floating-point multiply/add starting at the first unsupported
+/// pair, matching Python's staged `math.sumprod` behavior for float inputs.
+///
+/// CPython's math_sumprod_impl is a 3-stage state machine that handles
+/// int/float/generic Python objects. This function only covers the float
+/// path (`&[f64]`). The int accumulation and generic PyNumber fallback
+/// stages are Python type-system concerns and should be handled by the
+/// caller (e.g. RustPython) before delegating here.
+///
+/// Returns EDOM if the inputs are not the same length.
+pub fn sumprod(p: &[f64], q: &[f64]) -> crate::Result<f64> {
+    if p.len() != q.len() {
+        return Err(crate::Error::EDOM);
     }
 
-    tl_to_d(flt_total)
+    let mut total = 0.0;
+    let mut flt_total = TL_ZERO;
+    let mut flt_path_enabled = true;
+    let mut i = 0;
+
+    while i < p.len() {
+        let pi = p[i];
+        let qi = q[i];
+
+        if flt_path_enabled {
+            let new_flt_total = tl_fma(pi, qi, flt_total);
+            if new_flt_total.hi.is_finite() {
+                flt_total = new_flt_total;
+                i += 1;
+                continue;
+            }
+
+            flt_path_enabled = false;
+            total += tl_to_d(flt_total);
+        }
+
+        total += pi * qi;
+        i += 1;
+    }
+
+    Ok(if flt_path_enabled {
+        tl_to_d(flt_total)
+    } else {
+        total
+    })
 }
 
 /// Return the sum of products of values from two sequences (integer version).
@@ -427,14 +460,27 @@ mod tests {
         crate::test::with_py_math(|py, math| {
             let py_p = pyo3::types::PyList::new(py, p).unwrap();
             let py_q = pyo3::types::PyList::new(py, q).unwrap();
-            let py: f64 = math
-                .getattr("sumprod")
-                .unwrap()
-                .call1((py_p, py_q))
-                .unwrap()
-                .extract()
-                .unwrap();
-            crate::test::assert_f64_eq(py, rs, format_args!("sumprod({p:?}, {q:?})"));
+            let py_result = math.getattr("sumprod").unwrap().call1((py_p, py_q));
+            match py_result {
+                Ok(py_val) => {
+                    let py: f64 = py_val.extract().unwrap();
+                    let rs = rs.unwrap_or_else(|e| {
+                        panic!("sumprod({p:?}, {q:?}): py={py} but rs returned error {e:?}")
+                    });
+                    crate::test::assert_f64_eq(py, rs, format_args!("sumprod({p:?}, {q:?})"));
+                }
+                Err(e) => {
+                    if e.is_instance_of::<pyo3::exceptions::PyValueError>(py) {
+                        assert_eq!(
+                            rs.as_ref().err(),
+                            Some(&crate::Error::EDOM),
+                            "sumprod({p:?}, {q:?}): py raised ValueError but rs={rs:?}"
+                        );
+                    } else {
+                        panic!("sumprod({p:?}, {q:?}): py raised unexpected error {e}");
+                    }
+                }
+            }
         });
     }
 
@@ -444,6 +490,9 @@ mod tests {
         test_sumprod_impl(&[], &[]);
         test_sumprod_impl(&[1.0], &[2.0]);
         test_sumprod_impl(&[1e100, 1e100], &[1e100, -1e100]);
+        test_sumprod_impl(&[1.0, 1e308, -1e308], &[1.0, 2.0, 2.0]);
+        test_sumprod_impl(&[1e-16, 1e308, -1e308], &[1.0, 2.0, 2.0]);
+        test_sumprod_impl(&[1.0], &[]);
     }
 
     fn test_prod_impl(values: &[f64], start: Option<f64>) {

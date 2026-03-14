@@ -49,10 +49,26 @@ macro_rules! libm_simple {
 
 pub(crate) use libm_simple;
 
-/// math_1: wrapper for 1-arg functions
+/// Wrapper for 1-arg libm functions, corresponding to FUNC1/is_error in
+/// mathmodule.c.
+///
 /// - isnan(r) && !isnan(x) -> domain error
 /// - isinf(r) && isfinite(x) -> overflow (can_overflow=true) or domain error (can_overflow=false)
 /// - isfinite(r) && errno -> check errno (unnecessary on most platforms)
+///
+/// CPython's approach: clear errno, call libm, then inspect both the result
+/// and errno to classify errors. We rely primarily on output inspection
+/// (NaN/Inf checks) because:
+///
+/// - On macOS and Windows, libm functions do not reliably set errno for
+///   edge cases, so CPython's own is_error() skips the errno check there
+///   too (it only uses it as a fallback on other Unixes).
+/// - The NaN/Inf output checks are sufficient to detect all domain and
+///   range errors on every platform we test against (verified by proptest
+///   and edgetest against CPython via pyo3).
+/// - The errno-only branch (finite result with errno set) is kept for
+///   non-macOS/non-Windows Unixes where libm might signal an error
+///   without producing a NaN/Inf result.
 #[inline]
 pub(crate) fn math_1(x: f64, func: fn(f64) -> f64, can_overflow: bool) -> crate::Result<f64> {
     crate::err::set_errno(0);
@@ -75,9 +91,17 @@ pub(crate) fn math_1(x: f64, func: fn(f64) -> f64, can_overflow: bool) -> crate:
     Ok(r)
 }
 
-/// math_2: wrapper for 2-arg functions
+/// Wrapper for 2-arg libm functions, corresponding to FUNC2 in
+/// mathmodule.c.
+///
 /// - isnan(r) && !isnan(x) && !isnan(y) -> domain error
 /// - isinf(r) && isfinite(x) && isfinite(y) -> range error
+///
+/// Unlike math_1, this does not set/check errno at all. CPython's FUNC2
+/// does clear and check errno, but the NaN/Inf output checks already
+/// cover all error cases for the 2-arg functions we wrap (atan2, fmod,
+/// copysign, remainder, pow). This is verified by bit-exact proptest
+/// and edgetest against CPython.
 #[inline]
 pub(crate) fn math_2(x: f64, y: f64, func: fn(f64, f64) -> f64) -> crate::Result<f64> {
     let r = func(x, y);

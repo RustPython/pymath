@@ -63,7 +63,14 @@ pub fn comb_bigint(n: &BigInt, k: u64) -> BigUint {
 /// - mantissa is in [0.5, 1.0) for positive n
 /// - n ~= mantissa * 2^exponent
 ///
-/// See: _PyLong_Frexp in CPython longobject.c
+/// `_PyLong_Frexp` extracts digits one-by-one into a fixed-size
+/// accumulator and applies a `half_even_correction` lookup table for
+/// rounding.  We instead extract the top 55 bits via a single right
+/// shift and use a sticky-bit to mark whether any discarded bits were
+/// non-zero, then delegate to `BigInt::to_f64()` which performs
+/// IEEE 754 round-half-to-even.  The two approaches are equivalent
+/// because the sticky bit preserves the same rounding information
+/// that the digit-by-digit extraction would.
 fn frexp_bigint(n: &BigInt) -> (f64, i64) {
     let bits = n.bits();
     if bits == 0 {
@@ -87,8 +94,15 @@ fn frexp_bigint(n: &BigInt) -> (f64, i64) {
 
     // Sticky bit: if any shifted-out bits were non-zero, set the LSB.
     // This ensures correct IEEE round-half-to-even when converting to f64.
-    // See _PyLong_Frexp in longobject.c.
-    if (&mantissa_int << shift as u64) != *n {
+    //
+    // `_PyLong_Frexp` checks the remainder from `v_rshift` first, then
+    // iterates shifted-out digits top-down.  We use `trailing_zeros()`
+    // which scans digits bottom-up instead.  The worst-case traversal
+    // order differs (e.g. exact powers of two), but for typical inputs
+    // both terminate in O(1).  If you observe a performance regression
+    // from this, please file a bug report.
+    let tz = n.magnitude().trailing_zeros().unwrap(); // n != 0 here
+    if tz < shift as u64 {
         mantissa_int |= BigInt::from(1);
     }
 

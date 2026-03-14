@@ -6,22 +6,69 @@ super::libm_simple!(@1 ceil, floor, trunc);
 
 /// Return the next floating-point value after x towards y.
 ///
-/// If steps is provided, move that many steps towards y.
-/// Steps must be non-negative.
+/// If steps is provided, move that many steps towards y using O(1) bit
+/// manipulation on the IEEE 754 representation. Steps that overshoot y
+/// are clamped so the result never passes y.
+///
+/// CPython's math_nextafter_impl accepts a Python integer for steps,
+/// rejects negative values, and saturates overflows to UINT64_MAX. This
+/// Rust API takes `Option<u64>`, so negative rejection and big-int
+/// saturation are structurally unnecessary. The caller (e.g. RustPython)
+/// should handle Python int conversion and negative checks before calling.
+///
+/// See math_nextafter_impl in mathmodule.c.
 #[inline]
 pub fn nextafter(x: f64, y: f64, steps: Option<u64>) -> f64 {
-    match steps {
-        Some(n) => {
-            let mut result = x;
-            for _ in 0..n {
-                result = crate::m::nextafter(result, y);
-                if result == y {
-                    break;
-                }
-            }
-            result
+    let usteps = match steps {
+        None => return crate::m::nextafter(x, y),
+        Some(n) => n,
+    };
+
+    if usteps == 0 || x.is_nan() {
+        return x;
+    }
+    if y.is_nan() {
+        return y;
+    }
+
+    let mut ux = x.to_bits();
+    let uy = y.to_bits();
+    if ux == uy {
+        return x;
+    }
+
+    const SIGN_BIT: u64 = 1u64 << 63;
+    let ax = ux & !SIGN_BIT;
+    let ay = uy & !SIGN_BIT;
+
+    if (ux ^ uy) & SIGN_BIT != 0 {
+        // opposite signs — may need to cross zero
+        // ax + ay can never overflow because bit 63 is cleared in both
+        if ax + ay <= usteps {
+            y
+        } else if ax < usteps {
+            // cross zero: remaining steps land on y's side
+            f64::from_bits((uy & SIGN_BIT) | (usteps - ax))
+        } else {
+            ux -= usteps;
+            f64::from_bits(ux)
         }
-        None => crate::m::nextafter(x, y),
+    } else if ax > ay {
+        // same sign, moving toward zero
+        if ax - ay >= usteps {
+            ux -= usteps;
+            f64::from_bits(ux)
+        } else {
+            y
+        }
+    } else {
+        // same sign, moving away from zero
+        if ay - ax >= usteps {
+            ux += usteps;
+            f64::from_bits(ux)
+        } else {
+            y
+        }
     }
 }
 
@@ -178,6 +225,12 @@ pub fn fmod(x: f64, y: f64) -> Result<f64> {
 }
 
 /// Return the IEEE 754-style remainder of x with respect to y.
+///
+/// CPython implements this from scratch using fmod (m_remainder in
+/// mathmodule.c) rather than calling the C library's remainder().
+/// We delegate to libm's remainder() which is correct on all platforms
+/// where it conforms to IEEE 754. If you find a platform where the
+/// results differ from CPython, please file a bug.
 #[inline]
 pub fn remainder(x: f64, y: f64) -> Result<f64> {
     super::math_2(x, y, crate::m::remainder)
@@ -346,6 +399,64 @@ mod tests {
             for &y in crate::test::EDGE_VALUES {
                 test_remainder(x, y);
             }
+        }
+    }
+
+    #[test]
+    fn regression_remainder_halfway_even_cases() {
+        // These cases exercise the half-way branch in CPython's custom
+        // m_remainder implementation, where ties are resolved toward the
+        // even multiple of y.
+        let cases = [
+            ((6.0, 4.0), 0xc000_0000_0000_0000_u64),  // -2.0
+            ((3.0, 2.0), 0xbff0_0000_0000_0000_u64),  // -1.0
+            ((5.0, 2.0), 0x3ff0_0000_0000_0000_u64),  // 1.0
+            ((-6.0, 4.0), 0x4000_0000_0000_0000_u64), // 2.0
+            ((-5.0, 2.0), 0xbff0_0000_0000_0000_u64), // -1.0
+            ((1.5, 1.0), 0xbfe0_0000_0000_0000_u64),  // -0.5
+            ((2.5, 1.0), 0x3fe0_0000_0000_0000_u64),  // 0.5
+            ((3.5, 1.0), 0xbfe0_0000_0000_0000_u64),  // -0.5
+            ((4.5, 1.0), 0x3fe0_0000_0000_0000_u64),  // 0.5
+            ((5.5, 1.0), 0xbfe0_0000_0000_0000_u64),  // -0.5
+        ];
+
+        for &((x, y), expected_bits) in &cases {
+            let r = remainder(x, y).unwrap();
+            assert_eq!(
+                r.to_bits(),
+                expected_bits,
+                "remainder({x}, {y}) = {r} ({:#x}), expected {:#x}",
+                r.to_bits(),
+                expected_bits
+            );
+            test_remainder(x, y);
+        }
+    }
+
+    #[test]
+    fn regression_remainder_boundary_and_signed_zero_cases() {
+        // These cases pin the sign of zero and the behavior immediately
+        // around the half-way boundary.
+        let just_below_half = f64::from_bits(0x3fdf_ffff_ffff_ffff);
+        let just_above_half = f64::from_bits(0x3fe0_0000_0000_0001);
+        let cases = [
+            ((4.0, 2.0), 0x0000_0000_0000_0000_u64),  // +0.0
+            ((-4.0, 2.0), 0x8000_0000_0000_0000_u64), // -0.0
+            ((4.0, -2.0), 0x0000_0000_0000_0000_u64), // +0.0
+            ((just_below_half, 1.0), 0x3fdf_ffff_ffff_ffff_u64),
+            ((just_above_half, 1.0), 0xbfdf_ffff_ffff_fffe_u64),
+        ];
+
+        for &((x, y), expected_bits) in &cases {
+            let r = remainder(x, y).unwrap();
+            assert_eq!(
+                r.to_bits(),
+                expected_bits,
+                "remainder({x}, {y}) = {r} ({:#x}), expected {:#x}",
+                r.to_bits(),
+                expected_bits
+            );
+            test_remainder(x, y);
         }
     }
 
@@ -585,6 +696,148 @@ mod tests {
         #[test]
         fn proptest_fma(x: f64, y: f64, z: f64) {
             test_fma_impl(x, y, z);
+        }
+    }
+
+    fn test_nextafter(x: f64, y: f64) {
+        use pyo3::prelude::*;
+
+        let rs = nextafter(x, y, None);
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let py_f: f64 = math
+                .getattr("nextafter")
+                .unwrap()
+                .call1((x, y))
+                .unwrap()
+                .extract()
+                .unwrap();
+            if py_f.is_nan() && rs.is_nan() {
+                return;
+            }
+            assert_eq!(
+                py_f.to_bits(),
+                rs.to_bits(),
+                "nextafter({x}, {y}): py={py_f} vs rs={rs}"
+            );
+        });
+    }
+
+    fn test_nextafter_steps(x: f64, y: f64, steps: u64) {
+        use pyo3::prelude::*;
+
+        let rs = nextafter(x, y, Some(steps));
+        pyo3::Python::attach(|py| {
+            let math = pyo3::types::PyModule::import(py, "math").unwrap();
+            let kwargs = pyo3::types::PyDict::new(py);
+            kwargs.set_item("steps", steps).unwrap();
+            let py_f: f64 = math
+                .getattr("nextafter")
+                .unwrap()
+                .call((x, y), Some(&kwargs))
+                .unwrap()
+                .extract()
+                .unwrap();
+            if py_f.is_nan() && rs.is_nan() {
+                return;
+            }
+            assert_eq!(
+                py_f.to_bits(),
+                rs.to_bits(),
+                "nextafter({x}, {y}, steps={steps}): py={py_f} vs rs={rs}"
+            );
+        });
+    }
+
+    #[test]
+    fn edgetest_nextafter() {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
+                test_nextafter(x, y);
+            }
+        }
+    }
+
+    #[test]
+    fn edgetest_nextafter_steps() {
+        let x_vals = [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
+        let y_vals = [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
+        let steps = [0, 1, 2, 10, 100, 1000, u64::MAX];
+
+        for &x in &x_vals {
+            for &y in &y_vals {
+                for &s in &steps {
+                    test_nextafter_steps(x, y, s);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_nextafter_steps_large() {
+        // Large steps should saturate to target
+        test_nextafter_steps(0.0, 1.0, u64::MAX);
+        test_nextafter_steps(0.0, f64::INFINITY, u64::MAX);
+        test_nextafter_steps(1.0, -1.0, u64::MAX);
+        test_nextafter_steps(-1.0, 1.0, u64::MAX);
+
+        // Steps exactly reaching a value
+        // From 0.0 toward inf, 10 steps = 10 * 5e-324
+        test_nextafter_steps(0.0, f64::INFINITY, 10);
+        test_nextafter_steps(0.0, f64::NEG_INFINITY, 10);
+
+        // Crossing zero
+        test_nextafter_steps(5e-324, -5e-324, 1);
+        test_nextafter_steps(5e-324, -5e-324, 2);
+        test_nextafter_steps(5e-324, -5e-324, 3);
+        test_nextafter_steps(-5e-324, 5e-324, 1);
+        test_nextafter_steps(-5e-324, 5e-324, 2);
+        test_nextafter_steps(-5e-324, 5e-324, 3);
+
+        // Extreme steps that would hang with O(n) loop
+        let extreme_steps: &[u64] = &[
+            10u64.pow(9),
+            10u64.pow(15),
+            10u64.pow(18),
+            u64::MAX / 2,
+            u64::MAX - 1,
+            u64::MAX,
+        ];
+        for &s in extreme_steps {
+            test_nextafter_steps(0.0, 1.0, s);
+            test_nextafter_steps(0.0, f64::INFINITY, s);
+            test_nextafter_steps(1.0, 0.0, s);
+            test_nextafter_steps(-1.0, 1.0, s);
+            test_nextafter_steps(f64::MIN_POSITIVE, f64::MAX, s);
+            test_nextafter_steps(f64::MAX, f64::MIN_POSITIVE, s);
+        }
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn proptest_nextafter(x: f64, y: f64) {
+            test_nextafter(x, y);
+        }
+
+        #[test]
+        fn proptest_nextafter_steps(x: f64, y: f64, steps: u64) {
+            test_nextafter_steps(x, y, steps);
         }
     }
 }

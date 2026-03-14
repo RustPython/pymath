@@ -63,7 +63,14 @@ pub fn comb_bigint(n: &BigInt, k: u64) -> BigUint {
 /// - mantissa is in [0.5, 1.0) for positive n
 /// - n ~= mantissa * 2^exponent
 ///
-/// See: _PyLong_Frexp in CPython longobject.c
+/// `_PyLong_Frexp` extracts digits one-by-one into a fixed-size
+/// accumulator and applies a `half_even_correction` lookup table for
+/// rounding.  We instead extract the top 55 bits via a single right
+/// shift and use a sticky-bit to mark whether any discarded bits were
+/// non-zero, then delegate to `BigInt::to_f64()` which performs
+/// IEEE 754 round-half-to-even.  The two approaches are equivalent
+/// because the sticky bit preserves the same rounding information
+/// that the digit-by-digit extraction would.
 fn frexp_bigint(n: &BigInt) -> (f64, i64) {
     let bits = n.bits();
     if bits == 0 {
@@ -81,10 +88,24 @@ fn frexp_bigint(n: &BigInt) -> (f64, i64) {
         return (m, e as i64);
     }
 
-    // For large integers, extract top ~53 bits
-    // Shift right to keep DBL_MANT_DIG + 2 = 55 bits for rounding
+    // For large integers, extract top DBL_MANT_DIG + 2 = 55 bits for rounding
     let shift = bits - 55;
-    let mantissa_int = n >> shift as u64;
+    let mut mantissa_int = n >> shift as u64;
+
+    // Sticky bit: if any shifted-out bits were non-zero, set the LSB.
+    // This ensures correct IEEE round-half-to-even when converting to f64.
+    //
+    // `_PyLong_Frexp` checks the remainder from `v_rshift` first, then
+    // iterates shifted-out digits top-down.  We use `trailing_zeros()`
+    // which scans digits bottom-up instead.  The worst-case traversal
+    // order differs (e.g. exact powers of two), but for typical inputs
+    // both terminate in O(1).  If you observe a performance regression
+    // from this, please file a bug report.
+    let tz = n.magnitude().trailing_zeros().unwrap(); // n != 0 here
+    if tz < shift as u64 {
+        mantissa_int |= BigInt::from(1);
+    }
+
     let mut x = mantissa_int.to_f64().unwrap();
 
     // x is now approximately n / 2^shift, with ~55 bits of precision
@@ -119,7 +140,7 @@ pub fn log_bigint(n: &BigInt, base: Option<f64>) -> crate::Result<f64> {
     // Use frexp decomposition for large values
     // n ~= x * 2^e, so log(n) = log(x) + log(2) * e
     let (x, e) = frexp_bigint(n);
-    let log_n = crate::m::log(x) + std::f64::consts::LN_2 * (e as f64);
+    let log_n = crate::mul_add(crate::m::log(2.0), e as f64, crate::m::log(x));
 
     match base {
         None => Ok(log_n),
@@ -150,7 +171,11 @@ pub fn log2_bigint(n: &BigInt) -> crate::Result<f64> {
     // Use frexp decomposition for large values
     // n ~= x * 2^e, so log2(n) = log2(x) + e
     let (x, e) = frexp_bigint(n);
-    Ok(crate::m::log2(x) + (e as f64))
+    Ok(crate::mul_add(
+        crate::m::log2(2.0),
+        e as f64,
+        crate::m::log2(x),
+    ))
 }
 
 /// Return the base-10 logarithm of a BigInt.
@@ -171,7 +196,11 @@ pub fn log10_bigint(n: &BigInt) -> crate::Result<f64> {
     // Use frexp decomposition for large values
     // n ~= x * 2^e, so log10(n) = log10(x) + log10(2) * e
     let (x, e) = frexp_bigint(n);
-    Ok(crate::m::log10(x) + std::f64::consts::LOG10_2 * (e as f64))
+    Ok(crate::mul_add(
+        crate::m::log10(2.0),
+        e as f64,
+        crate::m::log10(x),
+    ))
 }
 
 /// Compute ldexp(x, exp) where exp is a BigInt.
@@ -333,6 +362,33 @@ mod tests {
         });
     }
 
+    fn assert_exact_log_bigint_bits(n: &BigInt, func_name: &str, rs: crate::Result<f64>) {
+        crate::test::with_py_math(|py, math| {
+            let n_str = n.to_string();
+            let builtins = pyo3::types::PyModule::import(py, "builtins").unwrap();
+            let py_n = builtins
+                .getattr("int")
+                .unwrap()
+                .call1((n_str.as_str(),))
+                .unwrap();
+            let py_f: f64 = math
+                .getattr(func_name)
+                .unwrap()
+                .call1((py_n,))
+                .unwrap()
+                .extract()
+                .unwrap();
+            let rs_f = rs.unwrap();
+            assert_eq!(
+                py_f.to_bits(),
+                rs_f.to_bits(),
+                "{func_name}({n}): py={py_f} ({:#x}) vs rs={rs_f} ({:#x})",
+                py_f.to_bits(),
+                rs_f.to_bits()
+            );
+        });
+    }
+
     #[test]
     fn edgetest_log_bigint() {
         // Small values
@@ -408,6 +464,45 @@ mod tests {
         fn proptest_log10_bigint(n in 1i64..1_000_000i64) {
             test_log10_bigint_impl(&BigInt::from(n));
         }
+    }
+
+    #[test]
+    fn regression_log_bigint_pow10_309() {
+        let n = BigInt::from(10).pow(309);
+        assert_exact_log_bigint_bits(&n, "log", log_bigint(&n, None));
+    }
+
+    #[test]
+    fn regression_log2_bigint_pow10_309() {
+        let n = BigInt::from(10).pow(309);
+        assert_exact_log_bigint_bits(&n, "log2", log2_bigint(&n));
+    }
+
+    #[test]
+    fn regression_log10_bigint_pow10_309() {
+        let n = BigInt::from(10).pow(309);
+        assert_exact_log_bigint_bits(&n, "log10", log10_bigint(&n));
+    }
+
+    #[test]
+    fn regression_log_bigint_sticky_bit_rounding() {
+        // If frexp_bigint drops the sticky bit, this rounds 1 ULP low.
+        let n = (BigInt::from(0x40000000000c02u64) << 970u32) + BigInt::from(1u8);
+        assert_exact_log_bigint_bits(&n, "log", log_bigint(&n, None));
+    }
+
+    #[test]
+    fn regression_log2_bigint_sticky_bit_rounding() {
+        // If frexp_bigint drops the sticky bit, this rounds 1 ULP low.
+        let n = (BigInt::from(0x400000000010a2u64) << 970u32) + BigInt::from(1u8);
+        assert_exact_log_bigint_bits(&n, "log2", log2_bigint(&n));
+    }
+
+    #[test]
+    fn regression_log10_bigint_sticky_bit_rounding() {
+        // If frexp_bigint drops the sticky bit, this rounds 1 ULP low.
+        let n = (BigInt::from(0x4000000000049au64) << 970u32) + BigInt::from(1u8);
+        assert_exact_log_bigint_bits(&n, "log10", log10_bigint(&n));
     }
 
     // ldexp_bigint tests

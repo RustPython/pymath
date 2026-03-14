@@ -113,7 +113,10 @@ pub fn log(x: f64, base: Option<f64>) -> Result<f64> {
             if den.is_infinite() && b.is_finite() {
                 return Err(crate::Error::EDOM);
             }
-            // log(x, 1) -> division by zero
+            // log(x, 1) -> division by zero.
+            // CPython raises ZeroDivisionError here (via PyNumber_TrueDivide),
+            // but we return EDOM since our error type has no ZeroDivisionError
+            // variant. The caller (e.g. RustPython) may remap this if needed.
             if den == 0.0 {
                 return Err(crate::Error::EDOM);
             }

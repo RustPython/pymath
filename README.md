@@ -1,6 +1,8 @@
 pymath
 ======
 
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/RustPython/pymath?utm_source=badge)
+
 **0 ULP (bit-exact) compatibility with CPython's math and cmath modules.**
 
 Every function produces identical results to Python at the binary representation level - not just "close enough", but exactly the same bits.

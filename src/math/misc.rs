@@ -295,6 +295,10 @@ mod tests {
         for &x in crate::test::EDGE_VALUES {
             for &y in crate::test::EDGE_VALUES {
                 for (result, maximum) in [(fmax(x, y), true), (fmin(x, y), false)] {
+                    // Observe the computed value: LLVM can infer a non-NaN result
+                    // from one numeric operand, but native extrema may quiet an
+                    // sNaN to NaN (notably in optimized AArch64 builds).
+                    let result = std::hint::black_box(result);
                     if x.is_nan() && y.is_nan() {
                         assert!(result.is_nan());
                     } else if x.is_nan() || y.is_nan() {
@@ -304,7 +308,15 @@ mod tests {
                         if !signaling(x) && !signaling(y) {
                             assert_eq!(result.to_bits(), expected.to_bits());
                         } else {
-                            assert!(result.is_nan() || result.to_bits() == expected.to_bits());
+                            assert!(
+                                result.is_nan() || result.to_bits() == expected.to_bits(),
+                                "f{}(0x{:016x}, 0x{:016x}) = 0x{:016x}; expected NaN or 0x{:016x}",
+                                if maximum { "max" } else { "min" },
+                                x.to_bits(),
+                                y.to_bits(),
+                                result.to_bits(),
+                                expected.to_bits(),
+                            );
                         }
                     } else {
                         let expected = if (x > y) == maximum { x } else { y };

@@ -13,7 +13,7 @@ Every function produces identical results to Python at the binary representation
 
 ## Compatibility Status
 
-### math (56/56)
+### math (61/61)
 
 - [x] `acos`
 - [x] `acosh`
@@ -38,6 +38,8 @@ Every function produces identical results to Python at the binary representation
 - [x] `fabs`
 - [x] `floor`
 - [x] `fma`
+- [x] `fmax`
+- [x] `fmin`
 - [x] `fmod`
 - [x] `frexp`
 - [x] `fsum`
@@ -48,6 +50,8 @@ Every function produces identical results to Python at the binary representation
 - [x] `isfinite`
 - [x] `isinf`
 - [x] `isnan`
+- [x] `isnormal`
+- [x] `issubnormal`
 - [x] `ldexp`
 - [x] `lgamma`
 - [x] `log`
@@ -63,6 +67,7 @@ Every function produces identical results to Python at the binary representation
 - [x] `radians`
 - [x] `remainder`
 - [x] `sin`
+- [x] `signbit`
 - [x] `sinh`
 - [x] `sqrt`
 - [x] `sumprod` (`sumprod`, `sumprod_int`)

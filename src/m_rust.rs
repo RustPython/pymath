@@ -152,6 +152,16 @@ pub fn floor(n: f64) -> f64 {
 }
 
 #[inline(always)]
+pub fn fmax(x: f64, y: f64) -> f64 {
+    libm::fmax(x, y)
+}
+
+#[inline(always)]
+pub fn fmin(x: f64, y: f64) -> f64 {
+    libm::fmin(x, y)
+}
+
+#[inline(always)]
 pub fn fmod(x: f64, y: f64) -> f64 {
     libm::fmod(x, y)
 }

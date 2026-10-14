@@ -48,6 +48,8 @@ unsafe extern "C" {
     // pub fn fdim(a: f64, b: f64) -> f64;
     pub fn fdimf(a: f32, b: f32) -> f32;
     pub fn floor(n: f64) -> f64;
+    pub fn fmax(x: f64, y: f64) -> f64;
+    pub fn fmin(x: f64, y: f64) -> f64;
     pub fn fmod(x: f64, y: f64) -> f64;
     pub fn frexp(n: f64, exp: *mut i32) -> f64;
     pub fn ldexp(x: f64, n: i32) -> f64;

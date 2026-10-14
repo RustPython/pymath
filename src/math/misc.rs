@@ -3,6 +3,7 @@
 use crate::{Error, Result, m};
 
 super::libm_simple!(@1 ceil, floor, trunc);
+super::libm_simple!(@2 fmax, fmin);
 
 /// Return the next floating-point value after x towards y.
 ///
@@ -102,6 +103,24 @@ pub fn isinf(x: f64) -> bool {
 #[inline]
 pub fn isnan(x: f64) -> bool {
     x.is_nan()
+}
+
+/// Return True if x is normal, False otherwise.
+#[inline]
+pub fn isnormal(x: f64) -> bool {
+    x.is_normal()
+}
+
+/// Return True if x is subnormal, False otherwise.
+#[inline]
+pub fn issubnormal(x: f64) -> bool {
+    x.is_subnormal()
+}
+
+/// Return True if the sign of x is negative, False otherwise.
+#[inline]
+pub fn signbit(x: f64) -> bool {
+    x.is_sign_negative()
 }
 
 /// Return True if a and b are close to each other.
@@ -258,6 +277,47 @@ pub fn ulp(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn edgetest_python315_classification() {
+        for &x in crate::test::EDGE_VALUES {
+            let bits = x.to_bits();
+            let exponent = (bits >> 52) & 0x7ff;
+            let fraction = bits & ((1_u64 << 52) - 1);
+            assert_eq!(isnormal(x), exponent != 0 && exponent != 0x7ff);
+            assert_eq!(issubnormal(x), exponent == 0 && fraction != 0);
+            assert_eq!(signbit(x), bits >> 63 != 0);
+        }
+    }
+
+    #[test]
+    fn edgetest_python315_extrema() {
+        for &x in crate::test::EDGE_VALUES {
+            for &y in crate::test::EDGE_VALUES {
+                for (result, maximum) in [(fmax(x, y), true), (fmin(x, y), false)] {
+                    if x.is_nan() && y.is_nan() {
+                        assert!(result.is_nan());
+                    } else if x.is_nan() || y.is_nan() {
+                        // Signaling NaNs can be quieted by the platform libm.
+                        let signaling = |v: f64| v.is_nan() && v.to_bits() & (1_u64 << 51) == 0;
+                        let expected = if x.is_nan() { y } else { x };
+                        if !signaling(x) && !signaling(y) {
+                            assert_eq!(result.to_bits(), expected.to_bits());
+                        } else {
+                            assert!(result.is_nan() || result.to_bits() == expected.to_bits());
+                        }
+                    } else {
+                        let expected = if (x > y) == maximum { x } else { y };
+                        // The sign of a zero tie is platform-dependent.
+                        assert_eq!(result, expected);
+                        if x != y {
+                            assert_eq!(result.to_bits(), expected.to_bits());
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// Edge integer values for testing functions like ldexp
     const EDGE_INTS: &[i32] = &[0, 1, -1, 100, -100, 1024, -1024, i32::MAX, i32::MIN];

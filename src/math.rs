@@ -18,8 +18,8 @@ pub use bigint::{comb_bigint, ldexp_bigint, log_bigint, log2_bigint, log10_bigin
 pub use exponential::{cbrt, exp, exp2, expm1, log, log1p, log2, log10, pow, sqrt};
 pub use gamma::{erf, erfc, gamma, lgamma};
 pub use misc::{
-    ceil, copysign, fabs, floor, fma, fmod, frexp, isclose, isfinite, isinf, isnan, ldexp, modf,
-    nextafter, remainder, trunc, ulp,
+    ceil, copysign, fabs, floor, fma, fmax, fmin, fmod, frexp, isclose, isfinite, isinf, isnan,
+    isnormal, issubnormal, ldexp, modf, nextafter, remainder, signbit, trunc, ulp,
 };
 pub use trigonometric::{
     acos, acosh, asin, asinh, atan, atan2, atanh, cos, cosh, sin, sinh, tan, tanh,

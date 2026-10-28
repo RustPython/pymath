@@ -247,12 +247,46 @@ pub fn fmod(x: f64, y: f64) -> Result<f64> {
 ///
 /// CPython implements this from scratch using fmod (m_remainder in
 /// mathmodule.c) rather than calling the C library's remainder().
-/// We delegate to libm's remainder() which is correct on all platforms
-/// where it conforms to IEEE 754. If you find a platform where the
-/// results differ from CPython, please file a bug.
 #[inline]
 pub fn remainder(x: f64, y: f64) -> Result<f64> {
-    super::math_2(x, y, crate::m::remainder)
+    super::math_2(x, y, m_remainder)
+}
+
+fn m_remainder(x: f64, y: f64) -> f64 {
+    if x.is_finite() && y.is_finite() {
+        if y == 0.0 {
+            return f64::NAN;
+        }
+
+        let absx = x.abs();
+        let absy = y.abs();
+        let m = m::fmod(absx, absy);
+        // Comparing with absy / 2 can round or underflow for subnormals.
+        // CPython compares the remainder with its complement instead.
+        let c = absy - m;
+        let r = if m < c {
+            m
+        } else if m > c {
+            -c
+        } else {
+            // At a tie, reducing half the preceding multiple modulo absy
+            // distinguishes odd and even multiples without rounding.
+            m - 2.0 * m::fmod(0.5 * (absx - m), absy)
+        };
+        return m::copysign(1.0, x) * r;
+    }
+
+    if x.is_nan() {
+        return x;
+    }
+    if y.is_nan() {
+        return y;
+    }
+    if x.is_infinite() {
+        return f64::NAN;
+    }
+    debug_assert!(y.is_infinite());
+    x
 }
 
 /// Return the value of the least significant bit of x.
@@ -475,6 +509,32 @@ mod tests {
     }
 
     #[test]
+    fn regression_remainder_subnormal_cases() {
+        let tiny = f64::from_bits(1);
+        for (x, y, expected) in [
+            (12.0, 23.0, -11.0),
+            (11.0, 23.0, 11.0),
+            (35.0, 23.0, -11.0),
+            (3.0, 2.0, -1.0),
+            (5.0, 2.0, 1.0),
+            (4.0, 2.0, 0.0),
+        ] {
+            for sx in [1.0, -1.0] {
+                for sy in [1.0, -1.0] {
+                    let x = sx * x * tiny;
+                    let y = sy * y * tiny;
+                    assert_eq!(
+                        remainder(x, y).unwrap().to_bits(),
+                        (sx * expected * tiny).to_bits(),
+                        "remainder({x}, {y})",
+                    );
+                    test_remainder(x, y);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn regression_remainder_halfway_even_cases() {
         // These cases exercise the half-way branch in CPython's custom
         // m_remainder implementation, where ties are resolved toward the
@@ -571,6 +631,18 @@ mod tests {
 
         #[test]
         fn proptest_remainder(x: f64, y: f64) {
+            test_remainder(x, y);
+        }
+
+        #[test]
+        fn proptest_remainder_subnormal(
+            x in 1_u64..(1_u64 << 52),
+            y in 1_u64..(1_u64 << 52),
+            negative_x: bool,
+            negative_y: bool,
+        ) {
+            let x = f64::from_bits(x | ((negative_x as u64) << 63));
+            let y = f64::from_bits(y | ((negative_y as u64) << 63));
             test_remainder(x, y);
         }
 

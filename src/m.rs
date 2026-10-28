@@ -193,11 +193,6 @@ pub fn nextafter(x: f64, y: f64) -> f64 {
 }
 
 #[inline(always)]
-pub fn remainder(x: f64, y: f64) -> f64 {
-    unsafe { m_sys::remainder(x, y) }
-}
-
-#[inline(always)]
 pub fn trunc(n: f64) -> f64 {
     unsafe { m_sys::trunc(n) }
 }

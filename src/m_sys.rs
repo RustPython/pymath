@@ -55,7 +55,6 @@ unsafe extern "C" {
     pub fn ldexp(x: f64, n: i32) -> f64;
     pub fn modf(n: f64, iptr: *mut f64) -> f64;
     pub fn nextafter(x: f64, y: f64) -> f64;
-    pub fn remainder(x: f64, y: f64) -> f64;
     pub fn trunc(n: f64) -> f64;
 
     // Special functions
